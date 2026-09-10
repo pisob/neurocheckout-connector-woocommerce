@@ -1,0 +1,10 @@
+.env
+.env.*
+*.log
+*.zip
+*.tar.gz
+*.pem
+*.key
+.DS_Store
+__pycache__/
+
