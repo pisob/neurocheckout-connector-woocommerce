@@ -1,58 +1,65 @@
-# NeuroCheckout Connector — WooCommerce
+# NeuroCheckout Connector for WooCommerce
 
-Dépôt officiel : https://github.com/pisob/neurocheckout-connector-woocommerce
+This is the official open-source WooCommerce connector for NeuroCheckout. It
+sends authenticated store events to NeuroCheckout Cloud and supports signed,
+read-only product and cart snapshots for the encrypted local vault in
+NeuroCheckout Community.
 
-## Statut : sources de développement, pas une release stable
+## Availability
 
-Ce premier dépôt public rend le code consultable. Il ne constitue pas une
-certification de sécurité ni une nouvelle version installable en production.
-Aucune release signée du connecteur n'est publiée à cette étape.
-Ne pas utiliser automatiquement la branche main comme canal de mise à jour.
+Installable packages are published on the repository's
+[Releases page](https://github.com/pisob/neurocheckout-connector-woocommerce/releases).
+If no release is listed, the repository contains development sources only and
+should not be installed by store operators.
 
-Les agents, décisions, workers, quotas et envois d'emails restent dans
-NeuroCheckout Cloud, dont le code n'est pas inclus ici. Community est
-l'interface auto-hébergée, pas un moteur Cloud autonome.
+Do not use **Code → Download ZIP** as an installation package. Official packages
+include version information, checksums and signatures needed to verify their
+origin and integrity.
 
-Le pilote de stockage local produits/paniers est **désactivé par défaut**.
-Sa validation de bout en bout reste incomplète ; le parcours Cloud existant
-reste utilisé. Publier ces sources n'active pas ce pilote.
+## Install an official package
 
-## Installation et environnement de test
+1. Back up the WordPress files and database.
+2. Download the connector package and all verification files from the same
+   official release.
+3. Verify the documented signing-key fingerprint, detached signature and
+   SHA-256 checksum.
+4. In WordPress, open **Plugins → Add New → Upload Plugin**.
+5. Upload the official connector ZIP without extracting it, then activate the
+   plugin.
+6. Open the connector settings and enter the API endpoint, store-specific
+   connector key and external store ID displayed in your NeuroCheckout account.
+7. Save the configuration and run the API connection test.
+8. Keep NeuroCheckout Community online when using encrypted local product and
+   cart storage.
 
-Les sources du plugin sont dans `neurocheckout-connector/`, à placer dans `wp-content/plugins/` sur une boutique de test sauvegardée.
+Never publish connector keys, customer records, cart contents or configuration
+exports in an issue or pull request. Back up the store before uninstalling or
+upgrading the plugin.
 
-Préférer les futurs paquets officiellement signés pour une installation utilisateur.
-Ne jamais désinstaller sans sauvegarder la base et la configuration : les données
-locales propres au connecteur et certains liens de récupération peuvent être perdus.
-Aucune boutique n'est modifiée par la publication de ce dépôt.
+## Development
 
-Utiliser uniquement une clé API connecteur émise pour la boutique et
-l'environnement sélectionnés ; le Client ID OAuth Community n'est pas cette clé.
-Ne jamais committer de clés, données clients, fichiers .env ou exports de base.
-Vérifier les consentements et les paramètres de données avant connexion au Cloud.
-
-## Validation
+The WordPress plugin source is located in `neurocheckout-connector/`.
 
 ```bash
 python3 tools/validate.py
 ```
 
-Ces contrôles exécutent le lint PHP et des tests isolés avec données synthétiques.
-Ils ne remplacent pas les tests d'installation, migration, cron, achat, rotation
-de clé et désinstallation sur les versions réelles de WooCommerce.
-Les contrôles CI ne disposent d'aucun secret staging ou production.
+Automated checks use synthetic data and do not replace platform-level tests for
+installation, upgrades, checkout events, key rotation and uninstallation.
 
-## Contributions et releases
+## Contributions and releases
 
-Les contributions externes ne sont pas encore ouvertes. Voir [CONTRIBUTING.md](CONTRIBUTING.md).
-Les releases exigent une validation manuelle, des tests staging, un checksum et
-une signature vérifiable ; aucun workflow de publication automatique n'est fourni.
-Voir [RELEASING.md](RELEASING.md) et [SECURITY.md](SECURITY.md).
+Submit changes through pull requests. Protected branches require automated
+validation and maintainer review. External contributions cannot publish official
+releases or access NeuroCheckout credentials.
 
-## Licence et marque
+Official releases are created from reviewed commits and include a signed tag,
+SHA-256 checksums and a detached signature. See
+[CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md) and
+[SECURITY.md](SECURITY.md).
 
-Code du connecteur : **GPL-2.0-or-later**, voir [LICENSE](LICENSE).
-Les notices tierces sont conservées. Cette licence ne transfère pas les droits
-sur la marque NeuroCheckout et ne donne pas accès au code privé du Cloud.
-Une copie modifiée ne doit pas être présentée comme une version officielle.
+## License and trademark
 
+The connector source is licensed under GPL-2.0-or-later. The NeuroCheckout name
+and logos remain protected. Modified distributions must not claim to be official
+NeuroCheckout releases.
