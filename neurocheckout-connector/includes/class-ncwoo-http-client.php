@@ -65,6 +65,18 @@ final class NCWooHttpClient
         return $this->send_with_candidates('/api/v1/events/customer-journey', $payload, $options);
     }
 
+    public function check_connector_version(): array
+    {
+        return $this->send_with_candidates(
+            '/api/v1/connectors/version-check',
+            [
+                'platform' => 'woocommerce',
+                'connector_version' => defined('NCWOO_CONNECTOR_VERSION') ? NCWOO_CONNECTOR_VERSION : '0.0.0',
+            ],
+            []
+        );
+    }
+
     /**
      * @return array<string,mixed>
      */

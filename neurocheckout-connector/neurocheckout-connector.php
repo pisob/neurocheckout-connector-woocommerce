@@ -2,16 +2,19 @@
 /**
  * Plugin Name: NeuroCheckout Connector (WooCommerce)
  * Description: Native WooCommerce connector aligned with NeuroCheckout PrestaShop/Magento business contracts.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: NeuroCheckout
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  * Requires Plugins: woocommerce
+ * Update URI: https://github.com/pisob/neurocheckout-connector-woocommerce
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
+
+define('NCWOO_CONNECTOR_VERSION', '1.0.3');
 
 require_once __DIR__ . '/includes/class-ncwoo-config.php';
 require_once __DIR__ . '/includes/class-ncwoo-db.php';

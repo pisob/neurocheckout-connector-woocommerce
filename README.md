@@ -36,6 +36,18 @@ Never publish connector keys, customer records, cart contents or configuration
 exports in an issue or pull request. Back up the store before uninstalling or
 upgrading the plugin.
 
+## Updates
+
+The plugin checks its version through the existing authenticated Cloud
+connection at most once every 24 hours when an authorized administrator uses
+WordPress. When an update is available, WordPress displays the exact official
+GitHub release. The Cloud cannot download or install code on the store.
+
+Back up WordPress, download the official plugin ZIP, then use **Plugins → Add
+New → Upload Plugin** and approve replacement of the installed plugin. Do not
+delete or uninstall the existing plugin first. WordPress replaces its files
+while retaining NeuroCheckout options and database tables.
+
 ## Development
 
 The WordPress plugin source is located in `neurocheckout-connector/`.
