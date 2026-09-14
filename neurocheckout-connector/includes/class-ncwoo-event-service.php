@@ -1170,7 +1170,7 @@ final class NCWooEventService
         }
 
         $meta['origin'] = $origin;
-        $meta['connector_version'] = '1.0.0';
+        $meta['connector_version'] = defined('NCWOO_CONNECTOR_VERSION') ? NCWOO_CONNECTOR_VERSION : '1.0.3';
         $privacy['contains_raw_server_logs'] = false;
         $privacy['contains_payment_provider_logs'] = false;
         $privacy['contains_customer_pii'] = false;

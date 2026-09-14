@@ -26,6 +26,54 @@ final class NCWooAdmin
         add_action('admin_post_ncwoo_test_cron', [$this, 'handle_test_cron']);
         add_action('admin_post_ncwoo_force_cron', [$this, 'handle_force_cron']);
         add_action('rest_api_init', [$this, 'register_rest_routes']);
+        add_action('admin_init', [$this, 'maybe_refresh_connector_update']);
+        add_action('admin_notices', [$this, 'render_connector_update_notice']);
+    }
+
+    public function maybe_refresh_connector_update(): void
+    {
+        if (!current_user_can('update_plugins')) {
+            return;
+        }
+        $checkedAt = (int) get_option('ncwoo_connector_update_checked_at', 0);
+        if ($checkedAt > 0 && (time() - $checkedAt) < DAY_IN_SECONDS) {
+            return;
+        }
+        update_option('ncwoo_connector_update_checked_at', time(), false);
+        $result = (new NCWooHttpClient($this->config))->check_connector_version();
+        if (empty($result['success']) || !is_string($result['body'] ?? null)) {
+            return;
+        }
+        $payload = json_decode($result['body'], true);
+        if (!is_array($payload) || ($payload['platform'] ?? '') !== 'woocommerce') {
+            return;
+        }
+        $url = esc_url_raw((string) ($payload['release_url'] ?? ''));
+        $officialPrefix = 'https://github.com/pisob/neurocheckout-connector-woocommerce/releases';
+        if (strpos($url, $officialPrefix) !== 0) {
+            return;
+        }
+        update_option('ncwoo_connector_update_status', sanitize_key((string) ($payload['status'] ?? 'current')), false);
+        update_option('ncwoo_connector_latest_version', sanitize_text_field((string) ($payload['latest_version'] ?? NCWOO_CONNECTOR_VERSION)), false);
+        update_option('ncwoo_connector_release_url', $url, false);
+    }
+
+    public function render_connector_update_notice(): void
+    {
+        if (!current_user_can('update_plugins')) {
+            return;
+        }
+        $status = (string) get_option('ncwoo_connector_update_status', 'current');
+        if (!in_array($status, ['available', 'required', 'blocked'], true)) {
+            return;
+        }
+        $latest = (string) get_option('ncwoo_connector_latest_version', '');
+        $url = (string) get_option('ncwoo_connector_release_url', '');
+        $class = $status === 'available' ? 'notice notice-warning' : 'notice notice-error';
+        echo '<div class="' . esc_attr($class) . '"><p>';
+        echo esc_html(sprintf('NeuroCheckout Connector %s is available. Back up your store and upload the official ZIP over the installed plugin. Do not uninstall it; configuration and data will be preserved.', $latest));
+        echo ' <a href="' . esc_url($url) . '" target="_blank" rel="noopener noreferrer">Download official update</a>';
+        echo '</p></div>';
     }
 
     public function register_menu(): void
