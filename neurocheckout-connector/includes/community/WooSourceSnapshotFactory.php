@@ -14,7 +14,7 @@ final class WooSourceSnapshotFactory
         global $wpdb, $wp_filter;
         if (($configuration['nativeScope'] ?? null) !== $scope || ($configuration['platform'] ?? null) !== 'woocommerce'
             || ($configuration['environment'] ?? null) !== 'staging'
-            || !defined('WC_VERSION') || !preg_match('/^10\.1\.[0-9]+$/D', WC_VERSION)
+            || !defined('WC_VERSION') || !self::supportsVersion(WC_VERSION)
             || !defined('WP_CONTENT_DIR') || file_exists(WP_CONTENT_DIR . '/db.php')
             || !is_object($wpdb) || get_class($wpdb) !== 'wpdb'
             || $scope !== (int) get_current_blog_id()
@@ -25,9 +25,38 @@ final class WooSourceSnapshotFactory
         }
         // Default native tables only. Do not silently bypass custom storage,
         // routing or option filters when opening the separate PDO connection.
-        foreach (['woocommerce_session_handler', 'woocommerce_data_stores', 'pre_option',
+        foreach (['pre_option',
             'pre_option_woocommerce_custom_orders_table_enabled', 'option_woocommerce_custom_orders_table_enabled'] as $hook) {
             if (has_filter($hook) !== false) { throw new RuntimeException('source_schema_unavailable'); }
+        }
+        // Core callbacks do not introduce custom cart/order storage: Store API
+        // sessions use the same native table; admin callbacks add report and
+        // fulfillment stores only. Unknown third-party handlers remain refused.
+        $nativeHooks = [
+            'woocommerce_session_handler' => [
+                'Automattic\\WooCommerce\\StoreApi\\Authentication::maybe_use_store_api_session_handler',
+            ],
+            'woocommerce_data_stores' => [
+                'Automattic\\WooCommerce\\Admin\\API\\Init::add_data_stores',
+                'Automattic\\WooCommerce\\Admin\\Features\\Fulfillments\\FulfillmentsController::register_data_stores',
+            ],
+        ];
+        foreach ($nativeHooks as $name => $allowed) {
+            if (has_filter($name) === false) { continue; }
+            $hook = $wp_filter[$name] ?? null;
+            if (!($hook instanceof \WP_Hook)) { throw new RuntimeException('source_schema_unavailable'); }
+            foreach ($hook->callbacks as $callbacks) {
+                foreach ($callbacks as $callback) {
+                    $fn = $callback['function'];
+                    if (!is_array($fn) || count($fn) !== 2 || !is_string($fn[1])) {
+                        throw new RuntimeException('source_schema_unavailable');
+                    }
+                    $class = is_object($fn[0]) ? get_class($fn[0]) : $fn[0];
+                    if (!is_string($class) || !in_array($class . '::' . $fn[1], $allowed, true)) {
+                        throw new RuntimeException('source_schema_unavailable');
+                    }
+                }
+            }
         }
         $hook = $wp_filter['woocommerce_order_data_store'] ?? null;
         if ($hook !== null) {
@@ -48,6 +77,14 @@ final class WooSourceSnapshotFactory
         $connection = new PDO($dsn, $user, $password, [PDO::ATTR_TIMEOUT => 2,
             PDO::MYSQL_ATTR_MULTI_STATEMENTS => false, PDO::ATTR_PERSISTENT => false]);
         return new WooSourceSnapshot($connection, $wpdb->prefix, $scope, $configuration['secret'], $configuration['shopId']);
+    }
+
+    /** Explicit supported native-storage version range. */
+    public static function supportsVersion(string $version): bool
+    {
+        // Explicit native-storage range. Schema, custom stores and DB transport
+        // are still checked independently; unknown future majors fail closed.
+        return preg_match('/^10\.[1-8]\.[0-9]+$/D', $version) === 1;
     }
 
     /** Pure validation. Never log the return value (contains native credentials). */
