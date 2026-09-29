@@ -11,14 +11,21 @@ use Throwable;
 final class SourcePullGateway
 {
     public static function handle(string $platform, int $nativeScope, string $webRoot, string $method,
-        string $uri, array $headers, string $raw, bool $https, ?callable $exporter = null): array
+        string $uri, array $headers, string $raw, bool $https, ?callable $exporter = null,
+        ?array $automaticConfiguration = null, ?string $automaticStateDirectory = null): array
     {
         try {
-            $path = (string) getenv('NC_COMMUNITY_SOURCE_CONFIG');
-            if ($path === '') {
-                return self::error(404, 'not_found');
+            if ($automaticConfiguration !== null) {
+                $configuration = self::validateConfiguration($automaticConfiguration);
+                $directory = self::automaticDirectory((string) $automaticStateDirectory, $webRoot);
+            } else {
+                $path = (string) getenv('NC_COMMUNITY_SOURCE_CONFIG');
+                if ($path === '') {
+                    return self::error(404, 'not_found');
+                }
+                $configuration = self::configuration($path, $webRoot);
+                $directory = dirname($path);
             }
-            $configuration = self::configuration($path, $webRoot);
             if ($configuration['enabled'] !== true || $configuration['environment'] !== 'staging') {
                 return self::error(404, 'not_found');
             }
@@ -26,7 +33,7 @@ final class SourcePullGateway
                 || $nativeScope < 1 || SourcePullProtocol::platformForPath($uri) !== $platform || !$https) {
                 return self::error(403, 'source_forbidden');
             }
-            $statePath = dirname($path) . '/source-' . hash('sha256', $platform . ':' . $nativeScope);
+            $statePath = $directory . '/source-' . hash('sha256', $platform . ':' . $nativeScope);
             self::guard($statePath, null, 0);
             $input = SourcePullProtocol::authenticate($method, $uri, $headers, $raw,
                 $configuration['shopId'], $configuration['secret'], (int) floor(microtime(true) * 1000),
@@ -36,7 +43,7 @@ final class SourcePullGateway
             if ($exporter === null) {
                 return self::error(503, 'source_export_not_ready');
             }
-            $page = $exporter($input, $nativeScope, $configuration, dirname($path));
+            $page = $exporter($input, $nativeScope, $configuration, $directory);
             self::validatePage($page, $input);
             $body = json_encode($page, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             return [200, self::headers() + [
@@ -66,6 +73,11 @@ final class SourcePullGateway
             throw new RuntimeException('source_private_configuration_required');
         }
         $value = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+        return self::validateConfiguration($value);
+    }
+
+    private static function validateConfiguration($value): array
+    {
         $keys = is_array($value) ? array_keys($value) : []; sort($keys);
         $expected = ['enabled', 'environment', 'nativeScope', 'platform', 'secret', 'shopId']; sort($expected);
         if ($keys !== $expected || !is_bool($value['enabled']) || !is_int($value['nativeScope'])
@@ -74,6 +86,23 @@ final class SourcePullGateway
             throw new RuntimeException('source_private_configuration_required');
         }
         return $value;
+    }
+
+    private static function automaticDirectory(string $path, string $webRoot): string
+    {
+        if ($path === '' || $path[0] !== '/') {
+            throw new RuntimeException('source_private_configuration_required');
+        }
+        if (!is_dir($path) && (!@mkdir($path, 0700, true) || !@chmod($path, 0700))) {
+            throw new RuntimeException('source_private_configuration_required');
+        }
+        self::privatePath($path, true);
+        $root = realpath($webRoot);
+        $resolved = realpath($path);
+        if (!$root || !$resolved || $resolved === $root) {
+            throw new RuntimeException('source_private_configuration_required');
+        }
+        return $resolved;
     }
 
     private static function privatePath(string $path, bool $directory): void
