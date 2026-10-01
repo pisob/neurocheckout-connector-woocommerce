@@ -1605,10 +1605,11 @@ final class NCWooAdmin
             ];
         }
 
+        $failure = is_array($probe) && empty($probe['success']) ? $probe : $health;
         return [
             'success' => false,
-            'status' => (int) ($health['status'] ?? 422),
-            'error' => (string) ($health['error'] ?? 'API check failed'),
+            'status' => (int) ($failure['status'] ?? 422),
+            'error' => (string) ($failure['error'] ?? 'API check failed'),
             'health' => $health,
             'event_probe' => $probe,
         ];

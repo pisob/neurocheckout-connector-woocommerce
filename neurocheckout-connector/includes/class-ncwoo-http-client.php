@@ -82,62 +82,16 @@ final class NCWooHttpClient
      */
     public function health(array $payload = []): array
     {
-        $endpoint = rtrim($this->config->get_string(NCWooConfig::OPTION_API_ENDPOINT), '/');
-        $apiKey = $this->config->get_api_key();
-
-        if ($endpoint === '' || $apiKey === '') {
-            return [
-                'success' => false,
-                'status' => 500,
-                'error' => 'API configuration missing',
-            ];
+        $result = $this->check_connector_version();
+        if (empty($result['success'])) {
+            return $result;
         }
-
-        $headers = [
-            'Accept' => 'application/json',
-            'X-API-Key' => $apiKey,
-        ];
-
-        $candidates = [
-            $endpoint . '/health',
-            $endpoint . '/',
-        ];
-
-        $lastError = '';
-        $lastStatus = 0;
-        $lastBody = '';
-
-        foreach ($candidates as $url) {
-            $response = wp_remote_get(
-                $url,
-                [
-                    'timeout' => 10,
-                    'headers' => $headers,
-                ]
-            );
-
-            if (is_wp_error($response)) {
-                $lastError = $response->get_error_message();
-                continue;
-            }
-
-            $status = (int) wp_remote_retrieve_response_code($response);
-            $body = (string) wp_remote_retrieve_body($response);
-
-            if ($status >= 200 && $status < 300) {
-                return [
-                    'success' => true,
-                    'status' => $status,
-                    'body' => $body,
-                ];
-            }
-
-            $lastStatus = $status;
-            $lastBody = $body;
-            $lastError = 'API check failed';
+        $data = json_decode((string) ($result['body'] ?? ''), true);
+        if (!is_array($data) || ($data['platform'] ?? null) !== 'woocommerce'
+            || ($data['installed_version'] ?? null) !== (defined('NCWOO_CONNECTOR_VERSION') ? NCWOO_CONNECTOR_VERSION : '0.0.0')) {
+            return $this->error_response((int) ($result['status'] ?? 0), 'Unexpected API response. Check the NeuroCheckout API endpoint.');
         }
-
-        return $this->error_response($lastStatus, $lastError !== '' ? $lastError : 'API check failed', $lastBody);
+        return $result;
     }
 
     /**
