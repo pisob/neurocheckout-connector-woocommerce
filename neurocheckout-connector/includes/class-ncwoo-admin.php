@@ -28,6 +28,30 @@ final class NCWooAdmin
         add_action('rest_api_init', [$this, 'register_rest_routes']);
         add_action('admin_init', [$this, 'maybe_refresh_connector_update']);
         add_action('admin_notices', [$this, 'render_connector_update_notice']);
+        add_action('admin_notices', [$this, 'render_scheduler_notice']);
+    }
+
+    public function render_scheduler_notice(): void
+    {
+        if (!current_user_can('manage_woocommerce') && !current_user_can('manage_options')) {
+            return;
+        }
+        $status = NCWooSchedulerHealth::status(
+            $this->config->get_execution_mode(),
+            defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+            (int) wp_next_scheduled('ncwoo_process_queue'),
+            (int) get_option(NCWooSchedulerHealth::LAST_TICK, 0),
+            $this->config->get_int(NCWooConfig::OPTION_CRON_INTERVAL_SECONDS, 300),
+            time()
+        );
+        if (!in_array($status, ['disabled', 'missing', 'overdue', 'external'], true)) {
+            return;
+        }
+        echo '<div class="notice notice-warning"><p>';
+        echo esc_html($this->i18n('scheduler_' . $status));
+        echo ' ' . esc_html($this->i18n('scheduler_help')) . ' ';
+        echo '<a href="' . esc_url(admin_url('admin.php?page=ncwoo-connector&tab=execution')) . '">';
+        echo esc_html($this->i18n('execution_mode_title')) . '</a></p></div>';
     }
 
     public function maybe_refresh_connector_update(): void
@@ -2448,11 +2472,16 @@ final class NCWooAdmin
                 'api_test_gate_ready_notice' => 'API test validated. Synchronization and event processing are authorized.',
                 'api_test_gate_validated_at_label' => 'Last validation',
                 'test_api_button' => 'Test API',
+                'scheduler_external' => 'NeuroCheckout: no recent server synchronization run has been observed. Check the configured server task.',
+                'scheduler_disabled' => 'NeuroCheckout: WP-Cron is disabled and no recent automatic queue run has been observed.',
+                'scheduler_missing' => 'NeuroCheckout: the automatic queue task is not scheduled.',
+                'scheduler_overdue' => 'NeuroCheckout: automatic synchronization is overdue. Cart and journey events may remain queued.',
+                'scheduler_help' => 'An API test alone does not verify background synchronization. Ask your administrator to enable WP-Cron or configure a regular server task, then check delivery in Monitoring. Do not share the cron command or its credentials.',
                 'execution_mode_title' => 'Execution mode',
                 'auto_sync_mode_label' => 'Auto mode (WP synchronization module)',
                 'server_sync_mode_label' => 'Server synchronization mode',
                 'server_cron_setup_title' => 'Server synchronization setup',
-                'server_cron_setup_help' => 'Add this line with crontab -e on the server hosting WordPress. The runner generates the secure synchronization signature at each execution.',
+                'server_cron_setup_help' => 'Add this line with crontab -e for the WordPress system user. The runner loads WordPress locally and sends authenticated events without a public loopback request.',
                 'server_cron_setup_note' => 'Recommended for production when you want execution independent from visitor traffic. Keep the WordPress scheduler enabled only if you stay in Auto mode.',
                 'debug_panel_title' => 'Debug mode',
                 'debug_panel_label' => 'Debug mode',
@@ -2563,11 +2592,16 @@ final class NCWooAdmin
                 'api_test_gate_ready_notice' => 'Test API valide. La synchronisation et le traitement des evenements sont autorises.',
                 'api_test_gate_validated_at_label' => 'Derniere validation',
                 'test_api_button' => 'Tester l API',
+                'scheduler_external' => 'NeuroCheckout : aucune synchronisation serveur récente n’a été observée. Vérifiez la tâche serveur configurée.',
+                'scheduler_disabled' => 'NeuroCheckout : WP-Cron est désactivé et aucune exécution automatique récente des files n’a été observée.',
+                'scheduler_missing' => 'NeuroCheckout : la tâche automatique des files n’est pas planifiée.',
+                'scheduler_overdue' => 'NeuroCheckout : la synchronisation automatique est en retard. Les paniers et signaux de parcours peuvent rester en attente.',
+                'scheduler_help' => 'Le test API ne vérifie pas à lui seul la synchronisation en arrière-plan. Demandez à votre administrateur d’activer WP-Cron ou de configurer une tâche serveur régulière, puis vérifiez les envois dans Monitoring. Ne partagez pas la commande cron ni ses identifiants.',
                 'execution_mode_title' => 'Mode d execution',
                 'auto_sync_mode_label' => 'Mode auto (module de synchronisation WP)',
                 'server_sync_mode_label' => 'Mode synchronisation serveur',
                 'server_cron_setup_title' => 'Configuration de la synchronisation serveur',
-                'server_cron_setup_help' => 'Ajoutez cette ligne avec crontab -e sur le serveur qui heberge WordPress. Le runner genere la signature securisee a chaque execution.',
+                'server_cron_setup_help' => 'Ajoutez cette ligne avec crontab -e pour l’utilisateur système de WordPress. Le script charge WordPress localement et transmet les événements authentifiés sans requête de retour par l’URL publique.',
                 'server_cron_setup_note' => 'Recommande en production pour une execution independante du trafic visiteur. Gardez le planificateur WordPress uniquement si vous restez en mode Auto.',
                 'debug_panel_title' => 'Mode debug',
                 'debug_panel_label' => 'Mode debug',
@@ -2654,11 +2688,16 @@ final class NCWooAdmin
                 'api_test_gate_ready_notice' => 'Prueba de API validada. Cron y procesamiento de eventos autorizados.',
                 'api_test_gate_validated_at_label' => 'Ultima validacion',
                 'test_api_button' => 'Probar API',
+                'scheduler_external' => 'NeuroCheckout: no se ha observado una sincronización reciente del servidor. Compruebe la tarea configurada.',
+                'scheduler_disabled' => 'NeuroCheckout: WP-Cron está desactivado y no se ha observado una ejecución automática reciente.',
+                'scheduler_missing' => 'NeuroCheckout: la tarea automática no está programada.',
+                'scheduler_overdue' => 'NeuroCheckout: la sincronización automática está atrasada. Los eventos pueden seguir en espera.',
+                'scheduler_help' => 'La prueba API no verifica la sincronización en segundo plano. Pida al administrador que active WP-Cron o configure una tarea periódica y compruebe los envíos en Monitoring. No comparta el comando cron ni sus credenciales.',
                 'execution_mode_title' => 'Modo de ejecucion',
                 'auto_sync_mode_label' => 'Modo auto (modulo de sincronizacion WP)',
                 'server_sync_mode_label' => 'Modo sincronizacion de servidor',
                 'server_cron_setup_title' => 'Configuracion del cron del servidor',
-                'server_cron_setup_help' => 'Anade esta linea con crontab -e en el servidor que aloja WordPress. El runner genera la firma segura en cada ejecucion.',
+                'server_cron_setup_help' => 'Anade esta linea con crontab -e para el usuario del sistema de WordPress. El script carga WordPress localmente y envia eventos autenticados sin una solicitud a la URL publica.',
                 'server_cron_setup_note' => 'Recomendado en produccion para una ejecucion independiente del trafico de visitantes. Mantenga WP-Cron solo si usa el modo Auto.',
                 'debug_panel_title' => 'Modo debug',
                 'debug_panel_label' => 'Modo debug',

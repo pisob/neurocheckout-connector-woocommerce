@@ -31,6 +31,20 @@ origin and integrity.
 7. Save the configuration and run the API connection test.
 8. Keep NeuroCheckout Community online when using encrypted local product and
    cart storage.
+9. Open **Execution** and verify the background scheduler. Automatic mode uses
+   WordPress cron: it needs site traffic, working loopback requests, and either
+   enabled WP-Cron or a server task that regularly invokes WordPress cron.
+   If your host disables WP-Cron or the store has little traffic, ask the host to
+   configure a reliable server schedule. Alternatively select the connector's
+   server mode and configure the command shown there for the WordPress system
+   user. The script reads the existing configuration locally; do not put an API
+   key in the crontab. Never enable two connector runners at once.
+10. Add a test cart and visit a product. After the configured synchronization
+    interval, verify **Monitoring** for successful processing and check the cart
+    and journey signals in Community. **Test API** verifies connectivity, not
+    ongoing background processing. Investigate missing/overdue task warnings
+    before relying on recovery emails. The store, scheduler and network must
+    remain available; no plugin can run scheduled work while the host is offline.
 
 Never publish connector keys, customer records, cart contents or configuration
 exports in an issue or pull request. Back up the store before uninstalling or

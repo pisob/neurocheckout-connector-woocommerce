@@ -26,6 +26,7 @@ require_once __DIR__ . '/includes/class-ncwoo-event-service.php';
 require_once __DIR__ . '/includes/class-ncwoo-customer-journey.php';
 require_once __DIR__ . '/includes/class-ncwoo-endpoints.php';
 require_once __DIR__ . '/includes/class-ncwoo-admin.php';
+require_once __DIR__ . '/includes/class-ncwoo-scheduler-health.php';
 require_once __DIR__ . '/includes/class-ncwoo-community-source.php';
 
 final class NCWooConnector
@@ -99,6 +100,7 @@ final class NCWooConnector
         add_action('wp_enqueue_scripts', [$this, 'enqueue_checkout_telemetry_script']);
         add_action('wp_enqueue_scripts', [$this->customerJourney, 'enqueue_script']);
         add_action('ncwoo_process_queue', [$this->events, 'process_queue'], 10, 0);
+        add_action('ncwoo_process_queue', ['NCWooSchedulerHealth', 'record_tick'], 1, 0);
         add_action('ncwoo_process_queue', [$this->customerJourney, 'process_queue'], 20, 0);
         add_filter('rest_pre_serve_request', [$this, 'maybe_serve_gzip_rest_response'], 10, 4);
         add_filter(
