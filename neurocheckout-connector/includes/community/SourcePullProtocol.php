@@ -30,7 +30,7 @@ final class SourcePullProtocol
         bool $enabled,
         string $environment
     ): array {
-        if (!$enabled || $environment !== 'staging') {
+        if (!$enabled || !in_array($environment, ['staging', 'production'], true)) {
             throw new RuntimeException('source_disabled');
         }
         self::secret($secret);

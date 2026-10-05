@@ -13,7 +13,7 @@ final class WooSourceSnapshotFactory
     {
         global $wpdb, $wp_filter;
         if (($configuration['nativeScope'] ?? null) !== $scope || ($configuration['platform'] ?? null) !== 'woocommerce'
-            || ($configuration['environment'] ?? null) !== 'staging'
+            || !in_array($configuration['environment'] ?? null, ['staging', 'production'], true)
             || !defined('WC_VERSION') || !self::supportsVersion(WC_VERSION)
             || !defined('WP_CONTENT_DIR') || file_exists(WP_CONTENT_DIR . '/db.php')
             || !is_object($wpdb) || get_class($wpdb) !== 'wpdb'

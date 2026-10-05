@@ -22,12 +22,14 @@ final class ReconciledSourceExporter
     public function __construct(string $directory, array $configuration, callable $snapshot, ?callable $clock = null)
     {
         self::privatePath($directory, true);
-        if (realpath($directory) !== $directory || $configuration['environment'] !== 'staging'
+        if (realpath($directory) !== $directory || !in_array($configuration['environment'], ['staging', 'production'], true)
             || !in_array($configuration['platform'], ['prestashop', 'magento', 'woocommerce'], true)
             || !preg_match('/^[a-f0-9]{64}$/D', $configuration['secret'])) {
             throw new RuntimeException('source_unavailable');
         }
         $this->binding = json_encode(['source-reconcile-v1', $configuration['platform'], $configuration['nativeScope'], $configuration['shopId']], JSON_THROW_ON_ERROR);
+        // Preserve existing test snapshots; production never reuses their state.
+        if ($configuration['environment'] === 'production') { $this->binding .= ':production'; }
         $this->shopId = $configuration['shopId'];
         $this->key = hash_hkdf('sha256', hex2bin($configuration['secret']), 32, 'source-reconcile-encryption-v1', $this->binding);
         $this->base = $directory . '/reconcile-' . hash('sha256', $this->binding);
