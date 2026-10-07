@@ -25,7 +25,7 @@ $consume = static function ($n,$t) use (&$used): bool {
 $invoke = static function ($enabled=true,$env='staging',$body=null,$now=null) use ($class,$path,$headers,$raw,$secret,$time,$consume) {
     return $class::authenticate('POST',$path,$headers,$body ?? $raw,'synthetic-shop',$secret,$now ?? $time,$consume,$enabled,$env);
 };
-foreach ([[false,'staging',null,null],[true,'production',null,null],[true,'staging',$raw.'x',null],[true,'staging',null,$time+120001]] as $args) {
+foreach ([[false,'staging',null,null],[false,'production',null,null],[true,'invalid',null,null],[true,'staging',$raw.'x',null],[true,'staging',null,$time+120001]] as $args) {
     $rejected = false;
     try { $invoke(...$args); } catch (RuntimeException $e) { $rejected = true; }
     if (!$rejected) throw new RuntimeException('Unsafe request accepted');
@@ -34,4 +34,9 @@ if ($invoke()['shopId'] !== 'synthetic-shop') throw new RuntimeException('Valid 
 $rejected = false;
 try { $invoke(); } catch (RuntimeException $e) { $rejected = true; }
 if (!$rejected) throw new RuntimeException('Replay accepted');
+$used = [];
+if ($invoke(true, 'production')['shopId'] !== 'synthetic-shop') throw new RuntimeException('Production request rejected');
+$rejected = false;
+try { $invoke(true, 'production'); } catch (RuntimeException $e) { $rejected = true; }
+if (!$rejected) throw new RuntimeException('Production replay accepted');
 echo "Nonce constants, signed source request, replay, tampering, expiry and disabled modes checked.\n";

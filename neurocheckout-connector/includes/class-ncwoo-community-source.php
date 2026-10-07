@@ -40,10 +40,11 @@ final class NCWooCommunitySource
             if (class_exists('NCWooConfig')) {
                 $config = new NCWooConfig();
             }
-            if (isset($config) && rtrim($config->get_string(NCWooConfig::OPTION_API_ENDPOINT), '/') === 'https://community-api-staging.neurocheckout.com'
+            $environment = isset($config) ? AutomaticSourceBinding::environment($config->get_string(NCWooConfig::OPTION_API_ENDPOINT)) : null;
+            if (isset($config) && $environment !== null
                 && $config->is_api_test_validation_current()) {
                 $shopId = $config->get_shop_external_id();
-                $automatic = ['enabled' => true, 'environment' => 'staging', 'nativeScope' => $scope,
+                $automatic = ['enabled' => true, 'environment' => $environment, 'nativeScope' => $scope,
                     'platform' => 'woocommerce', 'shopId' => $shopId,
                     'secret' => AutomaticSourceBinding::secret($config->get_api_key(), $shopId)];
             }

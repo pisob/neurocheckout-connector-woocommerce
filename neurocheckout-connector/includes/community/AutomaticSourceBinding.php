@@ -11,6 +11,14 @@ final class AutomaticSourceBinding
 {
     private const DOMAIN = "neurocheckout-community-source-v1\0";
 
+    public static function environment(string $endpoint): ?string
+    {
+        $endpoint = rtrim(trim($endpoint), '/');
+        if ($endpoint === 'https://www.neurocheckout.com') { return 'production'; }
+        if ($endpoint === 'https://community-api-staging.neurocheckout.com') { return 'staging'; }
+        return null;
+    }
+
     public static function secret(string $apiKey, string $shopId): string
     {
         $apiKey = trim($apiKey);

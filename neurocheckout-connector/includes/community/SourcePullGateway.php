@@ -26,7 +26,7 @@ final class SourcePullGateway
                 $configuration = self::configuration($path, $webRoot);
                 $directory = dirname($path);
             }
-            if ($configuration['enabled'] !== true || $configuration['environment'] !== 'staging') {
+            if ($configuration['enabled'] !== true || !in_array($configuration['environment'], ['staging', 'production'], true)) {
                 return self::error(404, 'not_found');
             }
             if ($configuration['platform'] !== $platform || $configuration['nativeScope'] !== $nativeScope
@@ -39,7 +39,7 @@ final class SourcePullGateway
                 $configuration['shopId'], $configuration['secret'], (int) floor(microtime(true) * 1000),
                 static function (string $nonce, int $ttl) use ($statePath): bool {
                     return self::guard($statePath, $nonce, $ttl);
-                }, true, 'staging');
+                }, true, $configuration['environment']);
             if ($exporter === null) {
                 return self::error(503, 'source_export_not_ready');
             }

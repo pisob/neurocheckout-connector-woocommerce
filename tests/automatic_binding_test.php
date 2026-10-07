@@ -12,4 +12,16 @@ foreach ([['', 'fixture-shop'], ['key', '../shop'], ['key', ''], ['key', str_rep
     try { $class::secret(...$input); } catch (RuntimeException $error) { continue; }
     throw new RuntimeException('Invalid binding accepted');
 }
-echo "7 automatic binding assertions passed.\n";
+foreach ([
+    'https://www.neurocheckout.com' => 'production',
+    'https://www.neurocheckout.com/' => 'production',
+    'https://community-api-staging.neurocheckout.com' => 'staging',
+    'http://www.neurocheckout.com' => null,
+    'https://www.neurocheckout.com.evil.invalid' => null,
+    'https://user@www.neurocheckout.com' => null,
+    'https://www.neurocheckout.com/path' => null,
+    'http://localhost:3400' => null,
+] as $endpoint => $environment) {
+    if ($class::environment($endpoint) !== $environment) throw new RuntimeException('Invalid environment binding');
+}
+echo "15 automatic binding assertions passed.\n";
