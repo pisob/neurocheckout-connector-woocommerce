@@ -468,7 +468,7 @@ final class NCWooAdmin
                             <tr>
                                 <th scope="row"><label for="ncwoo_api_endpoint"><?php echo esc_html($i18n['api_endpoint_label']); ?></label></th>
                                 <td>
-                                    <input type="url" id="ncwoo_api_endpoint" name="ncwoo_api_endpoint" class="regular-text" value="<?php echo esc_attr($apiEndpoint); ?>" placeholder="https://api.neurocheckout.ai">
+                                    <input type="url" id="ncwoo_api_endpoint" name="ncwoo_api_endpoint" class="regular-text" value="<?php echo esc_attr($apiEndpoint); ?>" placeholder="https://www.neurocheckout.com">
                                 </td>
                             </tr>
                             <tr>
