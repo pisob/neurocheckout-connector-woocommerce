@@ -1,5 +1,13 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Customer identity in Community
+
+Cart snapshots expose a boolean `customer_is_guest` derived from native session
+identity, not billing email or customer-supplied fields. Session keys remain
+private and cart references remain unchanged across guest-to-account migration.
+Update Cloud's identity projection before installing this connector change;
+older snapshots remain conservatively classified as guests until refreshed.
+
 This is the official open-source WooCommerce connector for NeuroCheckout. It
 sends authenticated store events to NeuroCheckout Cloud and supports signed,
 read-only product and cart snapshots for the encrypted local vault in
