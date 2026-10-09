@@ -86,6 +86,9 @@ final class WooSessionProjection
         }
         $payload = [
             'source_schema' => 'woocommerce-session-v1',
+            // Native registered session keys are WordPress user IDs. Guest
+            // keys are random hashes (or t_ prefixed); never export the key.
+            'customer_is_guest' => preg_match('/^[1-9][0-9]{0,18}$/D', $sessionKey) !== 1,
             'status' => $items ? 'active' : 'empty',
             'conversion_status' => 'not_checked',
             'currency_status' => 'not_exported',

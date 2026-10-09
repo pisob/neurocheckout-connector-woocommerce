@@ -92,6 +92,12 @@ foreach (['private-session-key', 'private-line-key', 'private-line-hash', 'priva
 checkSession(SessionObjectTrap::$woke === 0, 'no object instantiated');
 $loggedIn = $reader->project('42', serialize($session), $now + 3600, $now);
 checkSession($loggedIn['sourceId'] === $record['sourceId'], 'guest login migration retains runtime cart identity');
+checkSession($loggedIn['payload']['customer_is_guest'] === false, 'native user session is registered');
+checkSession($record['payload']['customer_is_guest'] === true, 'email does not prove registration');
+foreach (['0', '0042', 't_42', str_repeat('1', 32), 'guest-key', '-1', '1.0'] as $guestKey) {
+    $guestRecord = $reader->project($guestKey, serialize($session), $now + 3600, $now);
+    checkSession($guestRecord['payload']['customer_is_guest'] === true, 'guest or ambiguous key stays guest');
+}
 $fallback = $session; unset($fallback['ncwoo_runtime_cart_id']);
 checkSession($project($fallback)['sourceId'] === $reader->cartReference('private-session-key'), 'legacy session fallback is opaque');
 checkSession($project($fallback)['sourceId'] !== $record['sourceId'], 'different native identities distinct');
