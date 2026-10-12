@@ -34,6 +34,8 @@ function get_current_blog_id() { global $testBlogId; return $testBlogId; }
 function is_multisite() { global $testMultisite; return $testMultisite; }
 $testFilters = [];
 function has_filter($name) { global $testFilters; return $testFilters[$name] ?? false; }
+function wp_get_attachment_image_url($id, $size) { return 'https://cdn.example.invalid/attachment-'.$id.'.jpg'; }
+function get_permalink($id) { return 'https://shop.example.invalid/product/'.$id; }
 class WooTestPDO extends PDO {
     public $onSessionRead = null;
     #[\ReturnTypeWillChange]
@@ -98,6 +100,11 @@ try {
     $wpdb = new wpdb(); $wp_filter = [];
     $config = ['enabled' => true, 'environment' => 'staging', 'platform' => 'woocommerce', 'nativeScope' => 2, 'shopId' => 'synthetic-shop', 'secret' => str_repeat('ab', 32)];
     checkWoo(count(WooSourceSnapshotFactory::create(2, $config)->capture(2)) === 3, 'factory isolated runtime connection');
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES(10,'_thumbnail_id','91')");
+    $withMedia=WooSourceSnapshotFactory::create(2,$config)->capture(2);
+    checkWoo($withMedia[0]['payload']['image_url']==='https://cdn.example.invalid/attachment-91.jpg', 'Real attachment identity, not product ID');
+    checkWoo($withMedia[0]['payload']['product_url']==='https://shop.example.invalid/product/10', 'Native product permalink');
+    checkWoo($withMedia[1]['payload']['image_status']==='absent', 'Missing thumbnail is explicit');
     $testMultisite = false; $testBlogId = 1; $wpdb->blogid = 0;
     $singleConfig = $config; $singleConfig['nativeScope'] = 1;
     checkWoo(count(WooSourceSnapshotFactory::create(1, $singleConfig)->capture(1)) === 3, 'single site permits native wpdb blogid zero with current blog one');

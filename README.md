@@ -1,5 +1,14 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Product details in Community emails
+
+Product snapshots include the native WordPress product permalink and thumbnail
+URL, including configured media filters/CDNs. The thumbnail attachment ID is
+resolved separately from the product ID. Missing thumbnails remain explicitly
+absent; the connector never guesses an image URL. Update the plugin in place
+and let Community synchronize before testing a new email. Previously sent
+emails are unchanged.
+
 ## Customer identity in Community
 
 Cart snapshots expose a boolean `customer_is_guest` derived from native session
@@ -15,10 +24,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-Installable packages are published on the repository's
-[Releases page](https://github.com/pisob/neurocheckout-connector-woocommerce/releases).
-If no release is listed, the repository contains development sources only and
-should not be installed by store operators.
+The current installable connector is **v1.0.9**:
+
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.9/neurocheckout-connector-woocommerce-1.0.9.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.9).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
