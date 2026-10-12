@@ -14,6 +14,7 @@ final class WooSourceSnapshot
     private int $blogId;
     private WooSessionProjection $sessions;
     private float $started = 0;
+    private $presentation;
     private const BASE_TABLES = ['options', 'posts', 'postmeta', 'woocommerce_sessions',
         'term_relationships', 'term_taxonomy', 'terms'];
     private const PRODUCT_META = ['_sku', '_price', '_regular_price', '_sale_price',
@@ -21,11 +22,12 @@ final class WooSourceSnapshot
         '_manage_stock', '_backorders', '_tax_status', '_tax_class', '_weight',
         '_length', '_width', '_height', '_virtual', '_downloadable', '_thumbnail_id'];
 
-    public function __construct(PDO $db, string $prefix, int $blogId, string $secret, string $shopId)
+    public function __construct(PDO $db, string $prefix, int $blogId, string $secret, string $shopId, ?callable $presentation = null)
     {
         if (!preg_match('/^[A-Za-z0-9_]+$/D', $prefix) || $blogId < 1
             || $db->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') { throw new RuntimeException('source_schema_unavailable'); }
         $this->db = $db; $this->prefix = $prefix; $this->blogId = $blogId;
+        $this->presentation = $presentation;
         $this->sessions = new WooSessionProjection($secret, $blogId, $shopId);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -156,6 +158,17 @@ final class WooSourceSnapshot
             $row['store_currency_hint'] = $options['woocommerce_currency'];
             $row['prices_include_tax'] = $options['woocommerce_prices_include_tax'];
             $row['pricing_status'] = 'stored_values_not_recalculated';
+            if ($this->presentation !== null) {
+                $presentation = ($this->presentation)((int) $row['ID'], (int) ($values['_thumbnail_id'] ?? 0));
+                foreach (['image_url', 'product_url'] as $key) {
+                    $url = (string) ($presentation[$key] ?? '');
+                    $parts = parse_url($url);
+                    $row[$key] = strlen($url) <= 2048 && !preg_match('/[\x00-\x20\x7f\\\\]/', $url)
+                        && is_array($parts) && in_array($parts['scheme'] ?? '', ['http','https'], true)
+                        && !empty($parts['host']) && !isset($parts['user']) && !isset($parts['pass']) ? $url : '';
+                }
+                $row['image_status'] = $row['image_url'] !== '' ? 'available' : 'absent';
+            }
             $result[] = ['kind' => 'product', 'sourceId' => (string) $row['ID'], 'payload' => $row];
         }
         return $result;

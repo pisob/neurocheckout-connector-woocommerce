@@ -76,7 +76,11 @@ final class WooSourceSnapshotFactory
         [$dsn, $user, $password] = self::connectionParameters(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD);
         $connection = new PDO($dsn, $user, $password, [PDO::ATTR_TIMEOUT => 2,
             PDO::MYSQL_ATTR_MULTI_STATEMENTS => false, PDO::ATTR_PERSISTENT => false]);
-        return new WooSourceSnapshot($connection, $wpdb->prefix, $scope, $configuration['secret'], $configuration['shopId']);
+        return new WooSourceSnapshot($connection, $wpdb->prefix, $scope, $configuration['secret'], $configuration['shopId'],
+            static function (int $id, int $thumbnailId): array {
+                return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
+                    'product_url' => (string) (get_permalink($id) ?: '')];
+            });
     }
 
     /** Explicit supported native-storage version range. */
