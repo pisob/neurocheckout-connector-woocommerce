@@ -27,6 +27,18 @@ private and cart references remain unchanged across guest-to-account migration.
 Update Cloud's identity projection before installing this connector change;
 older snapshots remain conservatively classified as guests until refreshed.
 
+## Checkout evidence (unreleased)
+
+Checkout placement time is recorded separately from the order draft's creation
+time. Repeated checkout hooks preserve both the original cart link and placement
+timestamp, including when the session was cleared or now contains another cart.
+Older orders without placement metadata keep an explicitly labelled creation-time
+fallback. A checkout/order event is attribution evidence, not proof of payment.
+
+Regression checks include the native WordPress 6.8.3 / WooCommerce 10.7.0
+bootstrap with synthetic orders in both posts and HPOS storage. These isolated
+hook tests do not replace a browser checkout and real mailbox verification.
+
 This is the official open-source WooCommerce connector for NeuroCheckout. It
 sends authenticated store events to NeuroCheckout Cloud and supports signed,
 read-only product and cart snapshots for the encrypted local vault in
