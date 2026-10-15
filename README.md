@@ -34,10 +34,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.9**:
+The current installable connector is **v1.0.10**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.9/neurocheckout-connector-woocommerce-1.0.9.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.9).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.10/neurocheckout-connector-woocommerce-1.0.10.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.10).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
