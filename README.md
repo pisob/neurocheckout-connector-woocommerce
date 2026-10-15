@@ -27,7 +27,11 @@ private and cart references remain unchanged across guest-to-account migration.
 Update Cloud's identity projection before installing this connector change;
 older snapshots remain conservatively classified as guests until refreshed.
 
-## Checkout evidence (unreleased)
+## Checkout evidence (1.0.11-rc.1 validation candidate)
+
+This prerelease is for controlled validation, not the default stable download.
+The stable release remains v1.0.10 until the complete real-cart, email and order
+journeys have been verified. Keep a backup before installing this candidate.
 
 Checkout placement time is recorded separately from the order draft's creation
 time. Repeated checkout hooks preserve both the original cart link and placement
