@@ -88,6 +88,23 @@ try {
     checkWoo(count($snapshot) === 3, 'product, variation, active guest; expired omitted');
     checkWoo($snapshot[0]['payload']['native_meta']->_price === '83.21000000', 'stored price precision');
     checkWoo($snapshot[1]['payload']['native_meta']->attribute_pa_color === 'blue', 'variation attributes');
+    // WC_Product_Variable_Data_Store_CPT::sync_price stores every distinct
+    // visible variation price on the parent; these are not duplicate errors.
+    $writer->exec("INSERT INTO wp_2_terms VALUES (2,'Variable','variable'); INSERT INTO wp_2_term_taxonomy VALUES (2,2,'product_type'); INSERT INTO wp_2_term_relationships VALUES (10,2)");
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (10,'_price','95.12345678'),(10,'_price','120.00')");
+    $variable = $reader->capture(2)[0]['payload'];
+    checkWoo($variable['native_meta']->_price === '83.21000000', 'native first scalar price preserved');
+    checkWoo($variable['native_price_values'] === ['83.21000000','95.12345678','120.00'], 'all variable prices preserved without float conversion');
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (10,'_sku','ambiguous')");
+    rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_scope_inconsistent');
+    $writer->exec("DELETE FROM wp_2_postmeta WHERE meta_value='ambiguous'");
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (11,'_price','10.00'),(11,'_price','20.00')");
+    rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_scope_inconsistent');
+    $writer->exec("DELETE FROM wp_2_postmeta WHERE post_id=11 AND meta_key='_price'");
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (10,'_price','bad-price')");
+    rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_scope_inconsistent');
+    $writer->exec("DELETE FROM wp_2_postmeta WHERE post_id=10 AND meta_key='_price' AND meta_value<>'83.21000000'");
+    $writer->exec("DELETE FROM wp_2_term_relationships WHERE term_taxonomy_id=2");
     checkWoo($snapshot[0]['payload']['terms'][0]['slug'] === 'test-category', 'scoped taxonomy');
     checkWoo($snapshot[2]['sourceId'] === $cartReference && $snapshot[2]['payload']['customer']->email === 'fixture@example.invalid', 'opaque guest cart');
     checkWoo($snapshot[2]['payload']['status'] === 'active' && $snapshot[2]['payload']['conversion_status'] === 'no_linked_order', 'native order absence');

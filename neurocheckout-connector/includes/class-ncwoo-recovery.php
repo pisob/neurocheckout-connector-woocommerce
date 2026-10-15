@@ -4,6 +4,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+final class NCWooRecoveryTokenException extends RuntimeException {}
+
 final class NCWooRecoveryService
 {
     public const LINK_TTL_SECONDS = 604800;
@@ -170,6 +172,15 @@ final class NCWooRecoveryService
         $mode = (string) ($resolved['mode'] ?? 'cart');
         $payload = $this->decode_payload_json($resolved['payload_json'] ?? null);
 
+        // Resolving is only a read. Claim atomically before changing a login,
+        // session or cart: another request may have consumed the same link.
+        if (!in_array($mode, ['cart', 'customer_session'], true)
+            || ($mode === 'cart' && (!function_exists('WC') || !WC()->cart))
+            || !$this->consume_token($token)) {
+            wp_safe_redirect(home_url('/'));
+            exit;
+        }
+
         if ($mode === 'customer_session') {
             $customerId = (int) ($resolved['customer_id'] ?? 0);
             if ($customerId > 0) {
@@ -177,7 +188,6 @@ final class NCWooRecoveryService
                 wp_set_current_user($customerId);
             }
 
-            $this->consume_token($token);
             $target = $this->safe_target_url((string) ($resolved['target_url'] ?? ''));
             wp_safe_redirect($target ?: wc_get_cart_url());
             exit;
@@ -226,8 +236,6 @@ final class NCWooRecoveryService
             }
         }
 
-        $this->consume_token($token);
-
         $target = $this->safe_target_url(
             (string) ($resolved['target_url'] ?? '')
         );
@@ -264,7 +272,7 @@ final class NCWooRecoveryService
 
         $payload = isset($data['payload_json']) && is_array($data['payload_json']) ? $data['payload_json'] : null;
 
-        $wpdb->insert(
+        $inserted = $wpdb->insert(
             $table,
             [
                 'token_hash' => $hash,
@@ -282,6 +290,10 @@ final class NCWooRecoveryService
                 '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s',
             ]
         );
+
+        if ($inserted !== 1) {
+            throw new NCWooRecoveryTokenException('recovery_token_persistence_failed');
+        }
 
         return $token;
     }
@@ -319,7 +331,7 @@ final class NCWooRecoveryService
         }
 
         $expiresAtRaw = trim((string) ($row['expires_at'] ?? ''));
-        $expiresTs = strtotime($expiresAtRaw);
+        $expiresTs = strtotime($expiresAtRaw . ' UTC');
         if ($expiresTs === false || $expiresTs <= time()) {
             return null;
         }
@@ -327,20 +339,18 @@ final class NCWooRecoveryService
         return $row;
     }
 
-    private function consume_token(string $token): void
+    private function consume_token(string $token): bool
     {
         global $wpdb;
 
         $table = $wpdb->prefix . 'ncwoo_recovery_token';
         $hash = hash('sha256', $token);
 
-        $wpdb->update(
-            $table,
-            ['used_at' => gmdate('Y-m-d H:i:s')],
-            ['token_hash' => $hash],
-            ['%s'],
-            ['%s']
-        );
+        $now = gmdate('Y-m-d H:i:s');
+        return $wpdb->query($wpdb->prepare(
+            "UPDATE {$table} SET used_at = %s WHERE token_hash = %s AND used_at IS NULL AND expires_at > %s",
+            $now, $hash, $now
+        )) === 1;
     }
 
     /**
@@ -668,6 +678,11 @@ final class NCWooRecoveryService
         }
 
         // Compatibility with Presta legacy signatures already in circulation.
+        // Those formats never signed a payload or target. Never let an old
+        // signature authorize newly attached cart/customer/redirect data.
+        if ($payloadEncoded !== '' || $targetUrl !== '') {
+            return false;
+        }
         $legacyWithFingerprint = implode(
             ':',
             [
@@ -692,7 +707,8 @@ final class NCWooRecoveryService
             ]
         );
 
-        return hash_equals(hash_hmac('sha256', $legacyWithoutFingerprint, $secret), $provided);
+        return $cartFingerprint === ''
+            && hash_equals(hash_hmac('sha256', $legacyWithoutFingerprint, $secret), $provided);
     }
 
     private function is_valid_legacy_customer_session_signature(
@@ -731,7 +747,7 @@ final class NCWooRecoveryService
             ]
         );
 
-        return hash_equals(hash_hmac('sha256', $legacy, $secret), $provided);
+        return $targetUrl === '' && hash_equals(hash_hmac('sha256', $legacy, $secret), $provided);
     }
 
     private function persist_runtime_cart_id(string $cartId): void

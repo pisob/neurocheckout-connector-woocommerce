@@ -12,6 +12,9 @@ final class WooSourceSnapshotFactory
     public static function create(int $scope, array $configuration): WooSourceSnapshot
     {
         global $wpdb, $wp_filter;
+        if (!self::hasPdoMysql()) {
+            throw new RuntimeException('source_dependency_missing_pdo_mysql');
+        }
         if (($configuration['nativeScope'] ?? null) !== $scope || ($configuration['platform'] ?? null) !== 'woocommerce'
             || !in_array($configuration['environment'] ?? null, ['staging', 'production'], true)
             || !defined('WC_VERSION') || !self::supportsVersion(WC_VERSION)
@@ -81,6 +84,13 @@ final class WooSourceSnapshotFactory
                 return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
                     'product_url' => (string) (get_permalink($id) ?: '')];
             });
+    }
+
+    public static function hasPdoMysql(): bool
+    {
+        return class_exists(PDO::class) && extension_loaded('pdo_mysql')
+            && defined('PDO::MYSQL_ATTR_MULTI_STATEMENTS')
+            && in_array('mysql', PDO::getAvailableDrivers(), true);
     }
 
     /** Explicit supported native-storage version range. */
