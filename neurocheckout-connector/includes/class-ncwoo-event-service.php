@@ -10,6 +10,7 @@ final class NCWooEventService
     private const CART_SNAPSHOT_VERSION = 1;
     private const CART_RUNTIME_SESSION_KEY = 'ncwoo_runtime_cart_id';
     private const CART_RECOVERY_COOKIE_KEY = 'ncwoo_recovery_cart_id';
+    private const CHECKOUT_TIME_META = '_ncwoo_checkout_processed_at';
     private const TELEMETRY_EVENT_TYPES = [
         'woocommerce.checkout.performance',
         'woocommerce.checkout.js_error',
@@ -73,8 +74,44 @@ final class NCWooEventService
 
     public function on_order_processed(int $orderId): void
     {
+        $this->record_checkout_time($orderId);
         $this->dispatch_order_event($orderId);
         $this->clear_runtime_cart_id();
+    }
+
+    private function record_checkout_time(int $orderId): void
+    {
+        // Checkout Blocks can create a draft long before the customer places
+        // an order. Record the placement hook, not a later payment or retry.
+        try {
+            $order = wc_get_order($orderId);
+            if (!$order instanceof WC_Order) {
+                return;
+            }
+            $existing = $this->order_event_time($order);
+            if ($existing['source'] !== 'checkout_processed') {
+                $order->update_meta_data(self::CHECKOUT_TIME_META, (string) time());
+                $order->save_meta_data();
+            }
+        } catch (Throwable $error) {
+            // Telemetry must never prevent a customer's checkout.
+        }
+    }
+
+    private function order_event_time(WC_Order $order): array
+    {
+        $created = $order->get_date_created();
+        $createdAt = $created ? (int) $created->getTimestamp() : 0;
+        $raw = $order->get_meta(self::CHECKOUT_TIME_META);
+        $now = time();
+        if ((is_string($raw) || is_int($raw)) && preg_match('/^[1-9][0-9]{0,9}$/D', (string) $raw)) {
+            $placedAt = (int) $raw;
+            if ($placedAt >= $createdAt && $placedAt <= $now) {
+                return ['at' => gmdate('c', $placedAt), 'source' => 'checkout_processed'];
+            }
+        }
+        return ['at' => gmdate('c', $createdAt > 0 ? $createdAt : $now),
+            'source' => $createdAt > 0 ? 'order_created_fallback' : 'observed_fallback'];
     }
 
     public function on_order_completed(int $orderId): void
@@ -89,6 +126,14 @@ final class NCWooEventService
     public function attach_cart_context_to_order($order): void
     {
         if (!$order instanceof WC_Order) {
+            return;
+        }
+
+        // Checkout Blocks may repeat the processed hook after our session cart
+        // has been cleared (or replaced by a new cart). Keep the original link;
+        // changing it changes the deterministic order event ID and attribution.
+        $existingCartId = $order->get_meta('_ncwoo_cart_id');
+        if ((is_string($existingCartId) || is_int($existingCartId)) && trim((string) $existingCartId) !== '') {
             return;
         }
 
@@ -2151,8 +2196,7 @@ final class NCWooEventService
             ? round(($discountAmount / $subtotal) * 100, 2)
             : 0.0;
 
-        $created = $order->get_date_created();
-        $occurredAt = $created ? gmdate('c', (int) $created->getTimestamp()) : gmdate('c');
+        $eventTime = $this->order_event_time($order);
         $visibleOrderNumber = trim((string) $order->get_order_number());
         if ($visibleOrderNumber === '') {
             $visibleOrderNumber = (string) $orderId;
@@ -2164,7 +2208,8 @@ final class NCWooEventService
         return [
             'event_id' => hash('sha256', implode('|', [$shopExternalId, (string) $orderId, $cartId])),
             'event_type' => 'order.completed',
-            'occurred_at' => $occurredAt,
+            'occurred_at' => $eventTime['at'],
+            'occurred_at_source' => $eventTime['source'],
             'language' => $languageCode,
             'order_id' => (string) $orderId,
             'technical_order_id' => (string) $orderId,
