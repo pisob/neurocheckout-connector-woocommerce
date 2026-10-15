@@ -91,6 +91,15 @@ final class NCWooEndpoints
 
     public function endpoint_coupon(WP_REST_Request $request): WP_REST_Response
     {
+        try {
+            return $this->create_coupon_response($request);
+        } catch (NCWooRecoveryTokenException $error) {
+            return $this->response(false, 503, 'recovery_token_persistence_failed');
+        }
+    }
+
+    private function create_coupon_response(WP_REST_Request $request): WP_REST_Response
+    {
         $security = $this->security->validate_signed_request($request, 'coupon', false);
         if (empty($security['success'])) {
             return $this->security_failure_response($security);
@@ -191,6 +200,15 @@ final class NCWooEndpoints
     }
 
     public function endpoint_cartrestore(WP_REST_Request $request): WP_REST_Response
+    {
+        try {
+            return $this->create_cartrestore_response($request);
+        } catch (NCWooRecoveryTokenException $error) {
+            return $this->response(false, 503, 'recovery_token_persistence_failed');
+        }
+    }
+
+    private function create_cartrestore_response(WP_REST_Request $request): WP_REST_Response
     {
         $security = $this->security->validate_signed_request($request, 'cartrestore', false);
         if (empty($security['success'])) {

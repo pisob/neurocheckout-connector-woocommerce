@@ -53,7 +53,8 @@ final class SourcePullGateway
             $codes = ['source_unauthorized' => 401, 'source_replay' => 409, 'source_invalid' => 400, 'source_rate_limited' => 429,
                 'source_resync_required' => 409, 'source_snapshot_capacity' => 503, 'source_snapshot_timeout' => 503,
                 'source_snapshot_not_transactional' => 503, 'source_scope_inconsistent' => 503,
-                'source_schema_unavailable' => 503, 'source_shop_unavailable' => 503];
+                'source_schema_unavailable' => 503, 'source_shop_unavailable' => 503,
+                'source_dependency_missing_pdo_mysql' => 503];
             $code = $error->getMessage();
             return self::error($codes[$code] ?? 503, isset($codes[$code]) ? $code : 'source_unavailable');
         }

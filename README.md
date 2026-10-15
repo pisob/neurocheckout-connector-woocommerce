@@ -2,6 +2,16 @@
 
 ## Product details in Community emails
 
+Community's read-only snapshot requires PHP `pdo_mysql` (in addition to
+WordPress's `mysqli`). Enable it in the web PHP runtime, not only in CLI.
+The connector reports a missing driver explicitly and shows an admin warning;
+an API connectivity test does not prove that local snapshots can be read.
+
+Variable products use WooCommerce's native multiple `_price` rows. Snapshots
+retain the first scalar value in `native_meta._price` for compatibility and
+preserve all values, in native order and precision, in `native_price_values`.
+They never change catalog prices or treat a parent price as a cart-line total.
+
 Product snapshots include the native WordPress product permalink and thumbnail
 URL, including configured media filters/CDNs. The thumbnail attachment ID is
 resolved separately from the product ID. Missing thumbnails remain explicitly
@@ -86,6 +96,12 @@ The WordPress plugin source is located in `neurocheckout-connector/`.
 ```bash
 python3 tools/validate.py
 ```
+
+For SQL integration, use a disposable MariaDB fixture socket (never your store
+database) and run `php tests/recovery_sql_test.php /tmp/nc-source-mariadb.XXXX/mariadb.sock`
+and `php neurocheckout-connector/tests/community_source_snapshot_test.php /tmp/nc-source-mariadb.XXXX/mariadb.sock`.
+Recovery tests cover failed inserts, lost/expired claims, ordering before login
+and cart mutation, and rejection of unsigned additions to older signed links.
 
 Automated checks use synthetic data and do not replace platform-level tests for
 installation, upgrades, checkout events, key rotation and uninstallation.

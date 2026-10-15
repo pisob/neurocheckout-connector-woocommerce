@@ -29,6 +29,22 @@ final class NCWooAdmin
         add_action('admin_init', [$this, 'maybe_refresh_connector_update']);
         add_action('admin_notices', [$this, 'render_connector_update_notice']);
         add_action('admin_notices', [$this, 'render_scheduler_notice']);
+        add_action('admin_notices', [$this, 'render_source_dependency_notice']);
+    }
+
+    public function render_source_dependency_notice(): void
+    {
+        if (!current_user_can('manage_woocommerce') && !current_user_can('manage_options')) {
+            return;
+        }
+        require_once __DIR__ . '/community/WooSourceSnapshotFactory.php';
+        if (\NeuroCheckout\WooCommerce\Community\WooSourceSnapshotFactory::hasPdoMysql()) {
+            return;
+        }
+        echo '<div class="notice notice-error"><p>' . esc_html__(
+            'NeuroCheckout Community cannot synchronize products and carts: PHP PDO MySQL (pdo_mysql) is missing. Ask your host to enable it for the PHP runtime serving WordPress. A successful API test alone does not validate this dependency.',
+            'neurocheckout-connector'
+        ) . '</p></div>';
     }
 
     public function render_scheduler_notice(): void

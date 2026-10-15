@@ -140,20 +140,40 @@ final class WooSourceSnapshot
             if ($row['post_type'] === 'product_variation' && ($ids[(string) $row['post_parent']] ?? '') !== 'product') {
                 throw new RuntimeException('source_scope_inconsistent');
             }
-            $meta = $this->rows('SELECT meta_key, LEFT(meta_value,16385) AS meta_value FROM ' . $this->table('postmeta')
-                . ' WHERE post_id=? AND (meta_key IN (' . implode(',', array_fill(0, count(self::PRODUCT_META), '?'))
-                . ") OR LEFT(meta_key,10)='attribute_') ORDER BY meta_id", array_merge([$row['ID']], self::PRODUCT_META), 128);
-            $values = [];
-            foreach ($meta as $entry) {
-                if (array_key_exists($entry['meta_key'], $values)) { throw new RuntimeException('source_scope_inconsistent'); }
-                $values[$entry['meta_key']] = $entry['meta_value'];
-            }
-            ksort($values);
-            $row['native_meta'] = (object) $values;
             $row['terms'] = $this->rows('SELECT tt.taxonomy, t.term_id, t.name, t.slug FROM ' . $this->table('term_relationships')
                 . ' tr JOIN ' . $this->table('term_taxonomy') . ' tt ON tt.term_taxonomy_id=tr.term_taxonomy_id JOIN '
                 . $this->table('terms') . " t ON t.term_id=tt.term_id WHERE tr.object_id=? AND (tt.taxonomy IN ('product_cat','product_type','product_visibility')
                 OR LEFT(tt.taxonomy,3)='pa_') ORDER BY tt.taxonomy,t.term_id", [$row['ID']], 128);
+            $types = array_values(array_filter($row['terms'], static function (array $term): bool {
+                return $term['taxonomy'] === 'product_type';
+            }));
+            $variable = $row['post_type'] === 'product' && count($types) === 1 && $types[0]['slug'] === 'variable';
+            $meta = $this->rows('SELECT meta_key, LEFT(meta_value,16385) AS meta_value FROM ' . $this->table('postmeta')
+                . ' WHERE post_id=? AND (meta_key IN (' . implode(',', array_fill(0, count(self::PRODUCT_META), '?'))
+                . ") OR LEFT(meta_key,10)='attribute_') ORDER BY meta_id", array_merge([$row['ID']], self::PRODUCT_META), 128);
+            $values = [];
+            $prices = [];
+            foreach ($meta as $entry) {
+                // Woo's native variable data store persists one _price row for
+                // each distinct visible child price. Keep its first-value
+                // scalar semantics and export all rows without rounding them.
+                if ($variable && $entry['meta_key'] === '_price') {
+                    $prices[] = $entry['meta_value'];
+                    if (array_key_exists('_price', $values)) { continue; }
+                }
+                if (array_key_exists($entry['meta_key'], $values)) { throw new RuntimeException('source_scope_inconsistent'); }
+                $values[$entry['meta_key']] = $entry['meta_value'];
+            }
+            if (count($prices) > 1) {
+                foreach ($prices as $price) {
+                    if (!preg_match('/^[0-9]{1,26}(?:\.[0-9]{1,8})?$/D', $price)) {
+                        throw new RuntimeException('source_scope_inconsistent');
+                    }
+                }
+            }
+            ksort($values);
+            $row['native_meta'] = (object) $values;
+            if ($variable) { $row['native_price_values'] = $prices; }
             $row['source_schema'] = 'woocommerce-native-v1';
             $row['store_currency_hint'] = $options['woocommerce_currency'];
             $row['prices_include_tax'] = $options['woocommerce_prices_include_tax'];

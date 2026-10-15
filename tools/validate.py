@@ -18,4 +18,6 @@ for test in ["neurocheckout-connector/tests/community_session_projection_test.ph
 subprocess.run(["php", str(root / "tests/api_connection_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/scheduler_health_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/cron_runner_test.php")], cwd=root, check=True, timeout=60)
+subprocess.run(["php", str(root / "tests/recovery_safety_test.php")], cwd=root, check=True, timeout=60)
+subprocess.run(["php", "-n", str(root / "tests/missing_pdo_test.php")], cwd=root, check=True, timeout=60)
 print("All PHP files linted; isolated tests passed. Real platform integration is not covered.")
