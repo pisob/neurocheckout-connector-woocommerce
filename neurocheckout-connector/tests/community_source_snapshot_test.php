@@ -5,6 +5,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 use NeuroCheckout\WooCommerce\Community\WooSourceSnapshot;
 use NeuroCheckout\WooCommerce\Community\WooSourceSnapshotFactory;
 use NeuroCheckout\WooCommerce\Community\WooSessionProjection;
+use NeuroCheckout\WooCommerce\Community\WooRecoveryIdentity;
 use NeuroCheckout\WooCommerce\Community\ReconciledSourceExporter;
 use NeuroCheckout\WooCommerce\Community\SourcePullGateway;
 
@@ -81,12 +82,21 @@ try {
     $insertSession->execute(['expired-session', $session, time() - 1]);
     $writer->prepare('INSERT INTO wp_3_woocommerce_sessions(session_key,session_value,session_expiry) VALUES (?,?,?)')->execute(['foreign-session', str_replace('fixture@', 'foreign@', $session), time()+3600]);
     $db = new WooTestPDO($dsn . ';dbname=' . $database, 'root', '');
-    $reader = new WooSourceSnapshot($db, 'wp_2_', 2, str_repeat('ab', 32), 'synthetic-shop');
+    $identity = new WooRecoveryIdentity(str_repeat('server-native-only', 3), 2, 'synthetic-shop');
+    $reader = new WooSourceSnapshot($db, 'wp_2_', 2, str_repeat('ab', 32), 'synthetic-shop', null, $identity);
     $projection = new WooSessionProjection(str_repeat('ab', 32), 2, 'synthetic-shop');
     $cartReference = $projection->cartReference($cartId);
     $snapshot = $reader->capture(2);
     checkWoo(count($snapshot) === 3, 'product, variation, active guest; expired omitted');
     checkWoo($snapshot[0]['payload']['native_meta']->_price === '83.21000000', 'stored price precision');
+    checkWoo($snapshot[2]['payload']['currency_precision'] === 2, 'native unsaved decimal default');
+    $writer->exec("INSERT INTO wp_2_options(option_name,option_value) VALUES ('woocommerce_price_num_decimals','0')");
+    $rounded = $reader->capture(2);
+    checkWoo($rounded[0]['payload']['currency_precision'] === 0 && $rounded[2]['payload']['currency_precision'] === 0, 'zero decimal precision is exported for cart and catalog');
+    checkWoo($rounded[2]['payload']['stored_totals']->total === '83.21', 'precision never rewrites stored totals');
+    $writer->exec("UPDATE wp_2_options SET option_value='invalid' WHERE option_name='woocommerce_price_num_decimals'");
+    rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_schema_unavailable');
+    $writer->exec("UPDATE wp_2_options SET option_value='2' WHERE option_name='woocommerce_price_num_decimals'");
     checkWoo($snapshot[1]['payload']['native_meta']->attribute_pa_color === 'blue', 'variation attributes');
     // WC_Product_Variable_Data_Store_CPT::sync_price stores every distinct
     // visible variation price on the parent; these are not duplicate errors.
@@ -182,6 +192,16 @@ try {
     $writer->exec("DELETE FROM wp_2_woocommerce_sessions WHERE session_key='private-guest-session'");
     $second = $pull();
     checkWoo($second['records'][0]['payload']['session_status'] === 'absent', 'order survives session removal');
+    $proof = $identity->issue($cartReference);
+    $writer->prepare("UPDATE wp_2_postmeta SET meta_value=? WHERE post_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartReference]);
+    $writer->prepare("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (100,'_ncwoo_recovered_cart_proof',?)")->execute([$proof]);
+    $restoredOrder = $reader->capture(2)[2];
+    checkWoo($restoredOrder['sourceId'] === $cartReference && $restoredOrder['payload']['orders'][0]['id'] === 100, 'posts order preserves restored identity without session');
+    checkWoo(strpos(json_encode($restoredOrder), $proof) === false, 'posts proof stays private');
+    $writer->exec("UPDATE wp_2_postmeta SET meta_value='invalid' WHERE meta_key='_ncwoo_recovered_cart_proof'");
+    rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_session_invalid');
+    $writer->exec("DELETE FROM wp_2_postmeta WHERE meta_key='_ncwoo_recovered_cart_proof'");
+    $writer->prepare("UPDATE wp_2_postmeta SET meta_value=? WHERE post_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartId]);
     $writer->exec("DELETE FROM wp_2_posts WHERE ID IN (10,11)");
     $third = $pull();
     checkWoo(count($third['records']) === 2 && $third['records'][0]['operation'] === 'delete', 'native product deletion emits tombstones');
@@ -195,9 +215,16 @@ try {
     checkWoo($hpos['status'] === 'order_present' && $hpos['orders'][0]['status'] === 'wc-checkout-draft', 'Blocks draft distinguished from paid conversion');
     $writer->exec("UPDATE wp_2_wc_orders SET status='wc-completed' WHERE id=100");
     checkWoo($reader->capture(2)[0]['payload']['orders'][0]['status'] === 'wc-completed', 'updated HPOS order observed');
+    $writer->prepare("UPDATE wp_2_wc_orders_meta SET meta_value=? WHERE order_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartReference]);
+    $writer->prepare("INSERT INTO wp_2_wc_orders_meta(order_id,meta_key,meta_value) VALUES (100,'_ncwoo_recovered_cart_proof',?)")->execute([$proof]);
+    $restoredOrder = $reader->capture(2)[0];
+    checkWoo($restoredOrder['sourceId'] === $cartReference && $restoredOrder['payload']['orders'][0]['id'] === 100, 'HPOS order preserves restored identity');
+    checkWoo(strpos(json_encode($restoredOrder), $proof) === false, 'HPOS proof stays private');
+    $writer->exec("DELETE FROM wp_2_wc_orders_meta WHERE meta_key='_ncwoo_recovered_cart_proof'");
+    $writer->prepare("UPDATE wp_2_wc_orders_meta SET meta_value=? WHERE order_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartId]);
     $writer->prepare("INSERT INTO wp_2_wc_orders_meta(order_id,meta_key,meta_value) VALUES (100,'_ncwoo_cart_id',?)")->execute([$cartId]);
     rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_scope_inconsistent');
-    $writer->exec('DELETE FROM wp_2_wc_orders_meta WHERE id=2');
+    $writer->exec("DELETE FROM wp_2_wc_orders_meta WHERE id<>1");
     $writer->exec('ALTER TABLE wp_2_wc_orders ENGINE=MyISAM');
     rejectWoo(static function () use ($reader) { $reader->capture(2); }, 'source_snapshot_not_transactional');
     $writer->exec('ALTER TABLE wp_2_wc_orders ENGINE=InnoDB');

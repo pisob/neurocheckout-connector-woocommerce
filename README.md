@@ -27,7 +27,14 @@ private and cart references remain unchanged across guest-to-account migration.
 Update Cloud's identity projection before installing this connector change;
 older snapshots remain conservatively classified as guests until refreshed.
 
-## Checkout evidence (1.0.11-rc.1 validation candidate)
+## Checkout evidence (1.0.11-rc.2 validation candidate)
+
+The second candidate preserves restored Community cart references using a
+server-only, shop-scoped proof, carried from the native recovery session to
+order metadata in both posts and HPOS storage. A cart ID prefix or browser
+cookie alone is not trusted. Old orders are not rewritten. Native display
+precision is exported separately from stored amounts for matching email prices
+(requires the coordinated Cloud update).
 
 This prerelease is for controlled validation, not the default stable download.
 The stable release remains v1.0.10 until the complete real-cart, email and order

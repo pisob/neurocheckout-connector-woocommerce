@@ -29,7 +29,9 @@ final class WooSourceSnapshotFactory
         // Default native tables only. Do not silently bypass custom storage,
         // routing or option filters when opening the separate PDO connection.
         foreach (['pre_option',
-            'pre_option_woocommerce_custom_orders_table_enabled', 'option_woocommerce_custom_orders_table_enabled'] as $hook) {
+            'pre_option_woocommerce_custom_orders_table_enabled', 'option_woocommerce_custom_orders_table_enabled',
+            'pre_option_woocommerce_price_num_decimals', 'option_woocommerce_price_num_decimals',
+            'wc_get_price_decimals'] as $hook) {
             if (has_filter($hook) !== false) { throw new RuntimeException('source_schema_unavailable'); }
         }
         // Core callbacks do not introduce custom cart/order storage: Store API
@@ -83,7 +85,7 @@ final class WooSourceSnapshotFactory
             static function (int $id, int $thumbnailId): array {
                 return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
                     'product_url' => (string) (get_permalink($id) ?: '')];
-            });
+            }, class_exists('NCWooConfig') ? WooRecoveryIdentity::fromConfig(new \NCWooConfig()) : null);
     }
 
     public static function hasPdoMysql(): bool

@@ -18,6 +18,11 @@ jobs:
           persist-credentials: false
       - name: Static checks and isolated tests
         run: python3 tools/validate.py
+      - name: Native source and recovery SQL regressions in an isolated fixture
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y mariadb-server php-mysql
+          bash tools/test-source-sql.sh
       - name: Scan published files for secrets
         shell: bash
         run: |
@@ -27,4 +32,3 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $scan_dir/gitleaks.tar.gz" | sha256sum -c -
           tar -xzf "$scan_dir/gitleaks.tar.gz" -C "$scan_dir" gitleaks
           "$scan_dir/gitleaks" dir . --redact --no-banner
-
