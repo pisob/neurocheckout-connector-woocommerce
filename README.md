@@ -21,6 +21,28 @@ emails are unchanged.
 
 ## Customer identity in Community
 
+### Recommendation consent (candidate, not released)
+
+Customers can explicitly allow or withdraw product-recommendation emails in
+**My account → Account details**. The preference is optional and initially
+unchecked; installing/upgrading never opts in existing customers. The native
+account form and a separate user/store/email-bound nonce protect the change.
+Consent is per site, not network-wide. Changing an account email requires a new
+choice on a fresh form; billing emails do not inherit permission. Existing
+third-party newsletter preferences are not automatically imported.
+
+Signed local snapshots include the current account identity and an explicit
+granted/denied/unknown preference. Unknown or unavailable is not permission.
+Posts and HPOS orders can still identify their account after the cart session
+expires, without changing payment evidence, cart references or billing data.
+Cloud must recheck native consent, unsubscribe/suppression and all sending rules
+before delivery. This change alone does not activate recommendation campaigns.
+Product snapshots also export the actual creation date for novelty ranking.
+
+Validation: `php tests/marketing_consent_test.php`, the full isolated validator
+and disposable MariaDB source/recovery tests. These tests do not certify a real
+recommendation delivery. No live customer preference is changed by tests.
+
 Cart snapshots expose a boolean `customer_is_guest` derived from native session
 identity, not billing email or customer-supplied fields. Session keys remain
 private and cart references remain unchanged across guest-to-account migration.

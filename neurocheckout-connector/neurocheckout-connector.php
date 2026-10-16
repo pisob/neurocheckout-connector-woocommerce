@@ -28,6 +28,7 @@ require_once __DIR__ . '/includes/class-ncwoo-endpoints.php';
 require_once __DIR__ . '/includes/class-ncwoo-admin.php';
 require_once __DIR__ . '/includes/class-ncwoo-scheduler-health.php';
 require_once __DIR__ . '/includes/class-ncwoo-community-source.php';
+require_once __DIR__ . '/includes/class-ncwoo-marketing-consent.php';
 
 final class NCWooConnector
 {
@@ -69,6 +70,7 @@ final class NCWooConnector
             $this->events
         );
         $this->admin = new NCWooAdmin($this->config);
+        NCWooMarketingConsent::register();
 
         add_action('rest_api_init', [$this->endpoints, 'register_routes']);
         add_action('rest_api_init', [$this->customerJourney, 'register_routes']);

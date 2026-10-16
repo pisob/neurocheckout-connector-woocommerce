@@ -85,7 +85,8 @@ final class WooSourceSnapshotFactory
             static function (int $id, int $thumbnailId): array {
                 return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
                     'product_url' => (string) (get_permalink($id) ?: '')];
-            }, class_exists('NCWooConfig') ? WooRecoveryIdentity::fromConfig(new \NCWooConfig()) : null);
+            }, class_exists('NCWooConfig') ? WooRecoveryIdentity::fromConfig(new \NCWooConfig()) : null,
+            class_exists('NCWooMarketingConsent') ? [\NCWooMarketingConsent::class, 'snapshot'] : null);
     }
 
     public static function hasPdoMysql(): bool
