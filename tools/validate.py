@@ -16,6 +16,7 @@ for p in files:
 for test in ["neurocheckout-connector/tests/community_session_projection_test.php", "neurocheckout-connector/tests/community_version_test.php", "neurocheckout-connector/tests/order_event_time_test.php", "tests/automatic_binding_test.php", "tests/security_boundaries.php"]:
     subprocess.run(["php", str(root / test)], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/marketing_consent_test.php")], cwd=root, check=True, timeout=60)
+subprocess.run(["php", str(root / "tests/customer_history_protocol_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/api_connection_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/scheduler_health_test.php")], cwd=root, check=True, timeout=60)
 subprocess.run(["php", str(root / "tests/cron_runner_test.php")], cwd=root, check=True, timeout=60)

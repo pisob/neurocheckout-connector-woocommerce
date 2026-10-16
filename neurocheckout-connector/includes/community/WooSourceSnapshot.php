@@ -254,7 +254,11 @@ final class WooSourceSnapshot
             $payload['marketing_consent'] = $profile['marketing_consent'];
             // Keep cart billing fields untouched. Recommendations use the
             // separately scoped account identity, including after session expiry.
-            $payload['account_customer'] = $profile['customer'];
+            $account = (array) $profile['customer'];
+            // Native session/order identity, not billing fields or a profile
+            // callback's chosen ID. Remains inside the encrypted local record.
+            $account['id'] = $customerId;
+            $payload['account_customer'] = (object) $account;
         } catch (\Throwable $error) {
             // A failed marketing lookup must neither invent consent nor break
             // native recovery/conversion synchronization. Never log private data.

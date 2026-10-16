@@ -43,6 +43,34 @@ Validation: `php tests/marketing_consent_test.php`, the full isolated validator
 and disposable MariaDB source/recovery tests. These tests do not certify a real
 recommendation delivery. No live customer preference is changed by tests.
 
+### Complete account history (candidate, not released)
+
+With matching Community/Cloud support, the existing signed source route can
+read a registered account's native order history independently of surviving
+cart sessions. Only the authoritative posts or HPOS store is read; guest orders
+sharing an email and orders from another site/account are not borrowed. The
+native account ID is included in the encrypted-local account identity, separately
+from billing data. Older snapshots without that ID cannot authorize this read.
+
+Each read uses its own repeatable-read, READ ONLY transaction, verifies InnoDB
+storage under metadata locks, and includes the current site-specific consent
+without changing it. Order totals, paid dates and native refunds remain separate
+facts; an order status is not proof of paid revenue. Native decimal precision,
+product/variation IDs and original/refund line relationships are preserved.
+The result stays transient. Existing HMAC, TLS, nonce and rate protections apply;
+the response binds the exact request and must be fresh. Unsupported storage,
+ambiguous data or more than 128 orders, 128 refunds, 512 lines or 64,000 bytes
+returns unavailable, never a truncated successful history. SQL statements are
+limited to one second and the complete native read to three cooperative seconds.
+
+Checks: `php tests/customer_history_protocol_test.php` (65 assertions) and
+`php tests/customer_history_sql_test.php /tmp/nc-source-mariadb.XXXX/mariadb.sock`
+(58 assertions), plus existing source/recovery tests. A read-only candidate bridge
+was compared with native WooCommerce 10.7.0 order services and the Community
+transport. It did not install the candidate, change customer consent, send an
+email or test the live HTTPS route. This capability is not an autonomous campaign
+sender; profile aggregation and final sending checks are still required.
+
 Cart snapshots expose a boolean `customer_is_guest` derived from native session
 identity, not billing email or customer-supplied fields. Session keys remain
 private and cart references remain unchanged across guest-to-account migration.

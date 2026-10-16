@@ -94,7 +94,7 @@ try {
     $withCustomer = new WooSourceSnapshot($db, 'wp_2_', 2, str_repeat('ab', 32), 'synthetic-shop', null, $identity,
         static function ($id, $scope) use (&$profileCalls): array {
             $profileCalls[] = [$id, $scope];
-            return ['customer' => (object) ['email'=>'account@example.invalid'], 'marketing_consent'=>[
+            return ['customer' => (object) ['email'=>'account@example.invalid','id'=>'999'], 'marketing_consent'=>[
                 'state'=>'granted','source'=>'woocommerce_account_preference','email'=>'account@example.invalid','scope'=>'2','changed_at'=>null]];
         });
     $withCustomer->capture(2);
@@ -103,6 +103,7 @@ try {
     $registered = $withCustomer->capture(2)[2]['payload'];
     checkWoo($profileCalls === [[7,2]] && $registered['marketing_consent']['state'] === 'granted', 'native registered session selects scoped account reader');
     checkWoo($registered['account_customer']->email === 'account@example.invalid' && $registered['customer']->email === 'fixture@example.invalid', 'account identity separate from cart billing');
+    checkWoo($registered['account_customer']->id === '7', 'account ID comes from native session, not profile or billing');
     $writer->exec("UPDATE wp_2_woocommerce_sessions SET session_key='private-guest-session' WHERE session_key='7'");
     checkWoo($snapshot[0]['payload']['native_meta']->_price === '83.21000000', 'stored price precision');
     checkWoo($snapshot[2]['payload']['currency_precision'] === 2, 'native unsaved decimal default');

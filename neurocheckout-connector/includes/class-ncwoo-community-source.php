@@ -10,6 +10,7 @@ use NeuroCheckout\WooCommerce\Community\AutomaticSourceBinding;
 require_once __DIR__ . '/community/SourcePullProtocol.php';
 require_once __DIR__ . '/community/SourcePullGateway.php';
 require_once __DIR__ . '/community/BoundedPhpValueReader.php';
+require_once __DIR__ . '/community/WooCustomerOrderHistory.php';
 require_once __DIR__ . '/community/WooSessionProjection.php';
 require_once __DIR__ . '/community/WooSourceSnapshot.php';
 require_once __DIR__ . '/community/WooSourceSnapshotFactory.php';
@@ -54,11 +55,19 @@ final class NCWooCommunitySource
             return new WP_REST_Response('{"error":"source_unavailable"}', 503,
                 ['Content-Type'=>'application/json', 'Cache-Control'=>'no-store']);
         }
+        $raw = $request->get_body();
         [$status, $headers, $body] = SourcePullGateway::handle(
             'woocommerce', $scope, ABSPATH, $request->get_method(),
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
-            $request->get_body(), is_ssl(),
-            static function ($input, $scope, $configuration, $directory): array {
+            $raw, is_ssl(),
+            static function ($input, $scope, $configuration, $directory) use ($raw): array {
+                if (($input['operation'] ?? null) === 'customer_history') {
+                    $history = WooSourceSnapshotFactory::customerHistory($scope, $configuration)
+                        ->read($scope, (int) $input['customerId'], $input['customerEmail']);
+                    if ((int) get_current_blog_id() !== $scope) { throw new RuntimeException('customer_history_unavailable'); }
+                    return ['schema'=>1, 'shopId'=>$input['shopId'], 'operation'=>'customer_history',
+                        'requestHash'=>hash('sha256', $raw), 'history'=>$history];
+                }
                 return (new ReconciledSourceExporter($directory, $configuration,
                     static function () use ($scope, $configuration): array {
                         return WooSourceSnapshotFactory::create($scope, $configuration)->capture($scope);
