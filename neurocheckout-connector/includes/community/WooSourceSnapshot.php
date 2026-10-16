@@ -22,13 +22,13 @@ final class WooSourceSnapshot
         '_manage_stock', '_backorders', '_tax_status', '_tax_class', '_weight',
         '_length', '_width', '_height', '_virtual', '_downloadable', '_thumbnail_id'];
 
-    public function __construct(PDO $db, string $prefix, int $blogId, string $secret, string $shopId, ?callable $presentation = null)
+    public function __construct(PDO $db, string $prefix, int $blogId, string $secret, string $shopId, ?callable $presentation = null, ?WooRecoveryIdentity $recoveryIdentity = null)
     {
         if (!preg_match('/^[A-Za-z0-9_]+$/D', $prefix) || $blogId < 1
             || $db->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'mysql') { throw new RuntimeException('source_schema_unavailable'); }
         $this->db = $db; $this->prefix = $prefix; $this->blogId = $blogId;
         $this->presentation = $presentation;
-        $this->sessions = new WooSessionProjection($secret, $blogId, $shopId);
+        $this->sessions = new WooSessionProjection($secret, $blogId, $shopId, $recoveryIdentity);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
@@ -61,6 +61,7 @@ final class WooSourceSnapshot
                 $record['payload']['source_schema'] = 'woocommerce-native-v1';
                 $record['payload']['session_status'] = 'present';
                 $record['payload']['store_currency_hint'] = $options['woocommerce_currency'];
+                $record['payload']['currency_precision'] = $options['woocommerce_price_num_decimals'];
                 $record['payload']['conversion_status'] = 'no_linked_order';
                 $record['payload']['orders'] = [];
                 $record['payload']['order_storage'] = $hpos ? 'hpos' : 'posts';
@@ -78,13 +79,14 @@ final class WooSourceSnapshot
                 $id = (string) $native['id'];
                 if (isset($seenOrders[$id])) { throw new RuntimeException('source_scope_inconsistent'); }
                 $seenOrders[$id] = true;
-                $reference = $this->sessions->cartReference((string) $native['cart_id']);
-                unset($native['cart_id']); // Never export session/runtime identifiers.
+                $reference = $this->sessions->cartReference((string) $native['cart_id'], (string) ($native['recovery_proof'] ?? ''));
+                unset($native['cart_id'], $native['recovery_proof']); // Never export identifiers or private evidence.
                 if (!isset($carts[$reference])) {
                     $carts[$reference] = ['kind' => 'cart', 'sourceId' => $reference, 'payload' => [
                         'source_schema' => 'woocommerce-native-v1', 'session_status' => 'absent',
                         'items' => [], 'customer' => (object) [], 'stored_totals' => (object) [],
                         'currency_status' => 'not_exported', 'store_currency_hint' => $options['woocommerce_currency'],
+                        'currency_precision' => $options['woocommerce_price_num_decimals'],
                         'orders' => [], 'order_storage' => $hpos ? 'hpos' : 'posts',
                     ]];
                 }
@@ -115,17 +117,20 @@ final class WooSourceSnapshot
     private function options(): array
     {
         $rows = $this->rows('SELECT option_name, LEFT(option_value,129) AS option_value FROM ' . $this->table('options')
-            . " WHERE option_name IN ('woocommerce_custom_orders_table_enabled','woocommerce_currency','woocommerce_prices_include_tax') ORDER BY option_name", [], 3);
+            . " WHERE option_name IN ('woocommerce_custom_orders_table_enabled','woocommerce_currency','woocommerce_prices_include_tax','woocommerce_price_num_decimals') ORDER BY option_name", [], 4);
         $options = [];
         foreach ($rows as $row) {
             if (array_key_exists($row['option_name'], $options)) { throw new RuntimeException('source_schema_unavailable'); }
             $options[$row['option_name']] = $row['option_value'];
         }
         if (!preg_match('/^[A-Z]{3}$/D', $options['woocommerce_currency'] ?? '')
+            || !preg_match('/^[0-8]$/D', $options['woocommerce_price_num_decimals'] ?? '2')
             || !in_array($options['woocommerce_custom_orders_table_enabled'] ?? 'no', ['yes', 'no'], true)
             || !in_array($options['woocommerce_prices_include_tax'] ?? '', ['yes', 'no'], true)) {
             throw new RuntimeException('source_schema_unavailable');
         }
+        // Native Woo default when this option has not been saved yet.
+        $options['woocommerce_price_num_decimals'] = (int) ($options['woocommerce_price_num_decimals'] ?? '2');
         return $options;
     }
 
@@ -176,6 +181,7 @@ final class WooSourceSnapshot
             if ($variable) { $row['native_price_values'] = $prices; }
             $row['source_schema'] = 'woocommerce-native-v1';
             $row['store_currency_hint'] = $options['woocommerce_currency'];
+            $row['currency_precision'] = $options['woocommerce_price_num_decimals'];
             $row['prices_include_tax'] = $options['woocommerce_prices_include_tax'];
             $row['pricing_status'] = 'stored_values_not_recalculated';
             if ($this->presentation !== null) {
@@ -198,13 +204,18 @@ final class WooSourceSnapshot
     {
         if ($hpos) {
             return $this->rows('SELECT o.id, o.status, o.currency, o.total_amount, o.date_created_gmt, o.date_updated_gmt,
-                LEFT(m.meta_value,257) AS cart_id FROM ' . $this->table('wc_orders') . ' o JOIN '
-                . $this->table('wc_orders_meta') . " m ON m.order_id=o.id WHERE o.type='shop_order' AND m.meta_key='_ncwoo_cart_id'
+                LEFT(m.meta_value,257) AS cart_id, LEFT(r.meta_value,68) AS recovery_proof FROM ' . $this->table('wc_orders') . ' o JOIN '
+                . $this->table('wc_orders_meta') . ' m ON m.order_id=o.id LEFT JOIN '
+                . $this->table('wc_orders_meta') . " r ON r.order_id=o.id AND r.meta_key='_ncwoo_recovered_cart_proof'
+                WHERE o.type='shop_order' AND m.meta_key='_ncwoo_cart_id'
                 AND m.meta_value<>'' ORDER BY o.id,m.id", [], 256);
         }
         $orders = $this->rows('SELECT p.ID AS id, p.post_status AS status, p.post_date_gmt AS date_created_gmt,
-            p.post_modified_gmt AS date_updated_gmt, LEFT(m.meta_value,257) AS cart_id FROM ' . $this->table('posts') . ' p JOIN '
-            . $this->table('postmeta') . " m ON m.post_id=p.ID WHERE p.post_type='shop_order' AND m.meta_key='_ncwoo_cart_id'
+            p.post_modified_gmt AS date_updated_gmt, LEFT(m.meta_value,257) AS cart_id,
+            LEFT(r.meta_value,68) AS recovery_proof FROM ' . $this->table('posts') . ' p JOIN '
+            . $this->table('postmeta') . ' m ON m.post_id=p.ID LEFT JOIN '
+            . $this->table('postmeta') . " r ON r.post_id=p.ID AND r.meta_key='_ncwoo_recovered_cart_proof'
+            WHERE p.post_type='shop_order' AND m.meta_key='_ncwoo_cart_id'
             AND m.meta_value<>'' ORDER BY p.ID,m.meta_id", [], 256);
         foreach ($orders as &$order) {
             $meta = $this->rows('SELECT meta_key, LEFT(meta_value,129) AS meta_value FROM ' . $this->table('postmeta')

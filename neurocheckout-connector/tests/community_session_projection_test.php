@@ -8,6 +8,7 @@ require_once __DIR__ . '/../includes/community/WooSessionProjection.php';
 
 use NeuroCheckout\WooCommerce\Community\BoundedPhpValueReader;
 use NeuroCheckout\WooCommerce\Community\WooSessionProjection;
+use NeuroCheckout\WooCommerce\Community\WooRecoveryIdentity;
 
 $checks = 0;
 function checkSession(bool $condition, string $name): void
@@ -48,7 +49,8 @@ $session = [
     'plugin_value' => serialize(new SessionObjectTrap()),
 ];
 $now = 1800000000;
-$reader = new WooSessionProjection(str_repeat('ab', 32), 2, 'synthetic-shop');
+$identity = new WooRecoveryIdentity(str_repeat('native-server-only', 3), 2, 'synthetic-shop');
+$reader = new WooSessionProjection(str_repeat('ab', 32), 2, 'synthetic-shop', $identity);
 $project = static function (array $value) use ($reader, $now): array {
     return $reader->project('private-session-key', serialize($value), $now + 3600, $now);
 };
@@ -84,6 +86,27 @@ checkSession($record['payload']['customer']->email === 'guest@example.invalid', 
 checkSession($record['payload']['items'][0]['variation']->attribute_pa_color === 'bleu été', 'UTF-8 variation');
 checkSession($record['sourceId'] === $reader->cartReference($session['ncwoo_runtime_cart_id']), 'order metadata can share opaque reference');
 checkSession($record['sourceId'] === $project($session)['sourceId'], 'stable reference');
+$restored = $session;
+$restored['ncwoo_runtime_cart_id'] = $record['sourceId'];
+checkSession($project($restored)['sourceId'] !== $record['sourceId'], 'opaque prefix alone is not trusted');
+$proof = $identity->issue($record['sourceId']);
+$restored[WooRecoveryIdentity::SESSION_KEY] = $proof;
+checkSession($project($restored)['sourceId'] === $record['sourceId'], 'authenticated restoration does not hash the identity twice');
+checkSession($reader->project('42', serialize($restored), $now+3600, $now)['sourceId'] === $record['sourceId'], 'restored identity survives native guest to customer migration');
+checkSession($reader->cartReference($record['sourceId'], $proof) === $record['sourceId'], 'order metadata retains restored identity');
+checkSession(strpos(json_encode($project($restored)), $proof) === false, 'server proof never leaves the source boundary');
+foreach ([new WooRecoveryIdentity(str_repeat('native-server-only', 3), 3, 'synthetic-shop'),
+    new WooRecoveryIdentity(str_repeat('native-server-only', 3), 2, 'other-shop'),
+    new WooRecoveryIdentity(str_repeat('other-server-only', 3), 2, 'synthetic-shop'),
+    new WooRecoveryIdentity(str_repeat('ab', 32), 2, 'synthetic-shop')] as $foreignIdentity) {
+    checkSession(!$foreignIdentity->verifies($record['sourceId'], $proof), 'scope separation including client-known source secret');
+}
+foreach (['v1:' . str_repeat('0', 64), [], $identity->issue('wc-cart-' . str_repeat('0', 64))] as $invalidProof) {
+    $bad = $restored; $bad[WooRecoveryIdentity::SESSION_KEY] = $invalidProof;
+    rejectSession(static function () use ($project, $bad) { $project($bad); }, 'invalid restored evidence refused');
+}
+$bad = $restored; unset($bad['ncwoo_runtime_cart_id']);
+rejectSession(static function () use ($project, $bad) { $project($bad); }, 'orphaned evidence refused');
 foreach (['private-session-key', 'private-line-key', 'private-line-hash', 'private-payment-token',
     'private-total', 'private-phone', 'private-customer', 'private-provider', 'store_api_draft_order',
     $session['ncwoo_runtime_cart_id'], 'SessionObjectTrap'] as $secret) {

@@ -4,6 +4,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/community/WooRecoveryIdentity.php';
+
+use NeuroCheckout\WooCommerce\Community\WooRecoveryIdentity;
+
 final class NCWooRecoveryTokenException extends RuntimeException {}
 
 final class NCWooRecoveryService
@@ -764,6 +768,11 @@ final class NCWooRecoveryService
         }
 
         try {
+            // Never recover this proof from a browser cookie. Only this
+            // authenticated recovery path can preserve an opaque source ID.
+            $proof = preg_match('/^wc-cart-[a-f0-9]{64}$/D', $cartId)
+                ? WooRecoveryIdentity::fromConfig($this->config)->issue($cartId) : '';
+            WC()->session->set(WooRecoveryIdentity::SESSION_KEY, $proof);
             WC()->session->set('ncwoo_runtime_cart_id', $cartId);
         } catch (Throwable $e) {
             // Best effort only: session restore should never block customer navigation.

@@ -5,6 +5,8 @@ namespace NeuroCheckout\WooCommerce\Community;
 
 use RuntimeException;
 
+require_once __DIR__ . '/WooRecoveryIdentity.php';
+
 /**
  * Pure projection of one persisted native session. No DB, hooks or networking.
  * NOT an abandoned-cart decision or proof of conversion. A native consistent
@@ -13,27 +15,33 @@ use RuntimeException;
 final class WooSessionProjection
 {
     private string $referenceKey;
+    private ?WooRecoveryIdentity $recoveryIdentity;
     private const TOTALS = ['subtotal', 'subtotal_tax', 'shipping_total', 'shipping_tax',
         'discount_total', 'discount_tax', 'cart_contents_total', 'cart_contents_tax',
         'fee_total', 'fee_tax', 'total', 'total_tax'];
     private const CONTACT = ['email', 'first_name', 'last_name', 'billing_email',
         'billing_first_name', 'billing_last_name'];
 
-    public function __construct(string $secret, int $blogId, string $shopId)
+    public function __construct(string $secret, int $blogId, string $shopId, ?WooRecoveryIdentity $recoveryIdentity = null)
     {
         if (!preg_match('/^[a-f0-9]{64}$/D', $secret) || $blogId < 1
             || !preg_match('/^[A-Za-z0-9_.-]{1,128}$/D', $shopId)) { self::fail(); }
         $this->referenceKey = hash_hkdf('sha256', hex2bin($secret), 32,
             'nc-woo-cart-reference-v1', json_encode([$blogId, $shopId], JSON_THROW_ON_ERROR));
+        $this->recoveryIdentity = $recoveryIdentity;
     }
 
     /**
      * Use the same function for native _ncwoo_cart_id order metadata. Neither
      * that value nor session_key must cross the source boundary in clear text.
      */
-    public function cartReference(string $nativeId): string
+    public function cartReference(string $nativeId, string $recoveryProof = ''): string
     {
         if ($nativeId === '' || strlen($nativeId) > 256 || preg_match('/[^\x21-\x7e]/', $nativeId)) { self::fail(); }
+        if ($recoveryProof !== '') {
+            if ($this->recoveryIdentity === null || !$this->recoveryIdentity->verifies($nativeId, $recoveryProof)) { self::fail(); }
+            return $nativeId;
+        }
         return 'wc-cart-' . hash_hmac('sha256', $nativeId, $this->referenceKey);
     }
 
@@ -52,8 +60,9 @@ final class WooSessionProjection
         $customer = $this->arrayField($session, 'customer');
         if (count($cart) > 128) { self::fail(); }
         $runtimeId = $session['ncwoo_runtime_cart_id'] ?? '';
-        if (!is_string($runtimeId)) { self::fail(); }
-        $reference = $this->cartReference($runtimeId !== '' ? $runtimeId : $sessionKey);
+        $proof = $session[WooRecoveryIdentity::SESSION_KEY] ?? '';
+        if (!is_string($runtimeId) || !is_string($proof) || ($proof !== '' && $runtimeId === '')) { self::fail(); }
+        $reference = $this->cartReference($runtimeId !== '' ? $runtimeId : $sessionKey, $proof);
         $items = [];
         foreach ($cart as $line) {
             if (!is_array($line)) { self::fail(); }

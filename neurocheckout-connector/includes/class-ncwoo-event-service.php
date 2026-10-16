@@ -4,6 +4,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/community/WooRecoveryIdentity.php';
+
+use NeuroCheckout\WooCommerce\Community\WooRecoveryIdentity;
+
 final class NCWooEventService
 {
     private const MAX_RETRIES = 8;
@@ -146,6 +150,12 @@ final class NCWooEventService
         }
 
         try {
+            $proof = function_exists('WC') && WC()->session && method_exists(WC()->session, 'get')
+                ? WC()->session->get(WooRecoveryIdentity::SESSION_KEY) : '';
+            if (is_string($proof) && $proof !== ''
+                && WooRecoveryIdentity::fromConfig($this->config)->verifies($cartId, $proof)) {
+                $order->update_meta_data(WooRecoveryIdentity::ORDER_KEY, $proof);
+            }
             $order->update_meta_data('_ncwoo_cart_id', $cartId);
             $order->save();
         } catch (Throwable $e) {
@@ -2449,6 +2459,7 @@ final class NCWooEventService
             if (method_exists($session, 'set')) {
                 try {
                     $session->set(self::CART_RUNTIME_SESSION_KEY, $cookieCartId);
+                    $session->set(WooRecoveryIdentity::SESSION_KEY, '');
                 } catch (Throwable $e) {
                     // Keep cookie fallback even if session write fails.
                 }
@@ -2468,6 +2479,7 @@ final class NCWooEventService
         if (method_exists($session, 'set')) {
             try {
                 $session->set(self::CART_RUNTIME_SESSION_KEY, $cartId);
+                $session->set(WooRecoveryIdentity::SESSION_KEY, '');
             } catch (Throwable $e) {
                 return '';
             }
@@ -2503,6 +2515,7 @@ final class NCWooEventService
 
         try {
             WC()->session->set(self::CART_RUNTIME_SESSION_KEY, '');
+            WC()->session->set(WooRecoveryIdentity::SESSION_KEY, '');
         } catch (Throwable $e) {
             // Best effort cleanup.
         }
