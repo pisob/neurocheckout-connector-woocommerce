@@ -11,6 +11,7 @@ require_once __DIR__ . '/community/SourcePullProtocol.php';
 require_once __DIR__ . '/community/SourcePullGateway.php';
 require_once __DIR__ . '/community/BoundedPhpValueReader.php';
 require_once __DIR__ . '/community/WooCustomerOrderHistory.php';
+require_once __DIR__ . '/community/WooCustomerProductPrices.php';
 require_once __DIR__ . '/community/WooSessionProjection.php';
 require_once __DIR__ . '/community/WooSourceSnapshot.php';
 require_once __DIR__ . '/community/WooSourceSnapshotFactory.php';
@@ -61,6 +62,13 @@ final class NCWooCommunitySource
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
             $raw, is_ssl(),
             static function ($input, $scope, $configuration, $directory) use ($raw): array {
+                if (($input['operation'] ?? null) === 'customer_prices') {
+                    $prices = WooSourceSnapshotFactory::customerPrices($scope, $configuration)
+                        ->read($scope, (int) $input['customerId'], $input['customerEmail'], $input['productIds'], $input['currency']);
+                    if ((int) get_current_blog_id() !== $scope) { throw new RuntimeException('customer_prices_unavailable'); }
+                    return ['schema'=>1, 'shopId'=>$input['shopId'], 'operation'=>'customer_prices',
+                        'requestHash'=>hash('sha256', $raw), 'prices'=>$prices];
+                }
                 if (($input['operation'] ?? null) === 'customer_history') {
                     $history = WooSourceSnapshotFactory::customerHistory($scope, $configuration)
                         ->read($scope, (int) $input['customerId'], $input['customerEmail']);

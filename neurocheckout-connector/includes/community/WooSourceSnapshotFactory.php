@@ -35,6 +35,13 @@ final class WooSourceSnapshotFactory
         return new WooCustomerOrderHistory($connection,$wpdb->prefix,$wpdb->users,$wpdb->usermeta,$scope,is_multisite());
     }
 
+    public static function customerPrices(int $scope, array $configuration): WooCustomerProductPrices
+    {
+        // Retain the source's existing native runtime/custom-store guards.
+        self::connection($scope, $configuration);
+        return new WooCustomerProductPrices();
+    }
+
     private static function connection(int $scope,array $configuration): PDO
     {
         global $wpdb, $wp_filter;

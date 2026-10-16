@@ -71,6 +71,35 @@ transport. It did not install the candidate, change customer consent, send an
 email or test the live HTTPS route. This capability is not an autonomous campaign
 sender; profile aggregation and final sending checks are still required.
 
+### Recipient-specific recommendation prices (candidate, not released)
+
+The signed source route now supports a transient `customer_prices` read for up
+to 16 exact products and the registered account on the current site. Native
+customer identity, currency, saved billing/shipping/base tax address, VAT state,
+display precision and current sale/stock/held-stock evidence are checked. Simple
+products and fully specified variations are supported; variable-parent minimums,
+wildcard options, password-protected/hidden products and unavailable stock are not
+advertised. These are one-unit catalog offers, without shipping, cart coupons or
+a chosen pickup method, not a guaranteed checkout total.
+
+Tax calculation uses native Woo tax primitives with an explicit recipient; it
+does not impersonate a login or replace the current Woo customer/session. Unknown
+price/tax/data-store callbacks are refused rather than bypassed. Custom pricing,
+add-ons and tax extensions require separate qualification. A missing taxable
+address, expired sale price, context drift or three-second cooperative budget
+failure is unavailable, never a raw `_price` fallback. Existing source TLS/HMAC,
+nonce replay prevention, shop scope and rate limits remain mandatory. Replies
+bind the request hash, expire after 15 seconds and are limited to 16 KiB.
+
+Verification: 78 isolated reader checks, 38 signed-protocol checks, 8 read-only
+native offer comparisons on Woo 10.7.0, and 960 synthetic in-memory comparisons
+against its actual tax helpers (including compound taxes and rounding). Two
+candidate signed Community bridge reads and private Cloud validation passed,
+with replay refusal and no catalog/outbox records. No installed plugin, customer
+consent, order or SMTP was changed. This is not a live HTTPS/Cloud endpoint or
+real recommendation delivery test. Matching Community/Cloud changes and final
+pre-send checks are required before activation.
+
 Cart snapshots expose a boolean `customer_is_guest` derived from native session
 identity, not billing email or customer-supplied fields. Session keys remain
 private and cart references remain unchanged across guest-to-account migration.
