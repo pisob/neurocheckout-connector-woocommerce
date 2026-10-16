@@ -27,18 +27,21 @@ private and cart references remain unchanged across guest-to-account migration.
 Update Cloud's identity projection before installing this connector change;
 older snapshots remain conservatively classified as guests until refreshed.
 
-## Checkout evidence (1.0.11-rc.2 validation candidate)
+## Checkout evidence (1.0.11)
 
-The second candidate preserves restored Community cart references using a
+This release preserves restored Community cart references using a
 server-only, shop-scoped proof, carried from the native recovery session to
 order metadata in both posts and HPOS storage. A cart ID prefix or browser
 cookie alone is not trusted. Old orders are not rewritten. Native display
 precision is exported separately from stored amounts for matching email prices
 (requires the coordinated Cloud update).
 
-This prerelease is for controlled validation, not the default stable download.
-The stable release remains v1.0.10 until the complete real-cart, email and order
-journeys have been verified. Keep a backup before installing this candidate.
+The reviewed candidate completed a real cart-to-email-to-native-checkout journey,
+including Gmail logo/product rendering, an offline unpaid order, Cloud attribution,
+and encrypted Community synchronization. This validates the connector recovery
+path, not payment collection or independent product-recommendation campaigns.
+Recommendation engine improvements are a separate Cloud change. Keep a backup
+before upgrading; previous signed releases remain available for rollback.
 
 Checkout placement time is recorded separately from the order draft's creation
 time. Repeated checkout hooks preserve both the original cart link and placement
@@ -57,10 +60,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.10**:
+The current installable connector is **v1.0.11**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.10/neurocheckout-connector-woocommerce-1.0.10.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.10).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.11/neurocheckout-connector-woocommerce-1.0.11.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.11).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
