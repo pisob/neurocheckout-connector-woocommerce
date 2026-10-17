@@ -1,5 +1,7 @@
 # NeuroCheckout Connector for WooCommerce
 
+Version 1.0.12 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+
 ## Product details in Community emails
 
 Community's read-only snapshot requires PHP `pdo_mysql` (in addition to
@@ -21,7 +23,7 @@ emails are unchanged.
 
 ## Customer identity in Community
 
-### Recommendation consent (candidate, not released)
+### Recommendation consent (1.0.12)
 
 Customers can explicitly allow or withdraw product-recommendation emails in
 **My account → Account details**. The preference is optional and initially
@@ -43,7 +45,7 @@ Validation: `php tests/marketing_consent_test.php`, the full isolated validator
 and disposable MariaDB source/recovery tests. These tests do not certify a real
 recommendation delivery. No live customer preference is changed by tests.
 
-### Complete account history (candidate, not released)
+### Complete account history (1.0.12)
 
 With matching Community/Cloud support, the existing signed source route can
 read a registered account's native order history independently of surviving
@@ -71,7 +73,7 @@ transport. It did not install the candidate, change customer consent, send an
 email or test the live HTTPS route. This capability is not an autonomous campaign
 sender; profile aggregation and final sending checks are still required.
 
-### Recipient-specific recommendation prices (candidate, not released)
+### Recipient-specific recommendation prices (1.0.12)
 
 The signed source route now supports a transient `customer_prices` read for up
 to 16 exact products and the registered account on the current site. Native
@@ -139,10 +141,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.11**:
+The current installable connector is **v1.0.12**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.11/neurocheckout-connector-woocommerce-1.0.11.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.11).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.12/neurocheckout-connector-woocommerce-1.0.12.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.12).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
