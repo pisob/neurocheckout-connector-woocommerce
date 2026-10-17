@@ -63,7 +63,7 @@ try {
         'term_relationships' => 'object_id BIGINT, term_taxonomy_id BIGINT',
         'term_taxonomy' => 'term_taxonomy_id BIGINT PRIMARY KEY, term_id BIGINT, taxonomy VARCHAR(32)',
         'terms' => 'term_id BIGINT PRIMARY KEY, name VARCHAR(200), slug VARCHAR(200)',
-        'wc_orders' => 'id BIGINT PRIMARY KEY, status VARCHAR(20), currency VARCHAR(10), type VARCHAR(20), total_amount DECIMAL(26,8), date_created_gmt DATETIME, date_updated_gmt DATETIME',
+        'wc_orders' => 'id BIGINT PRIMARY KEY, status VARCHAR(20), currency VARCHAR(10), type VARCHAR(20), total_amount DECIMAL(26,8), date_created_gmt DATETIME, date_updated_gmt DATETIME, customer_id BIGINT DEFAULT 0',
         'wc_orders_meta' => 'id BIGINT AUTO_INCREMENT PRIMARY KEY, order_id BIGINT, meta_key VARCHAR(255), meta_value TEXT',
     ];
     foreach (['wp_2_', 'wp_3_'] as $prefix) {
@@ -88,6 +88,23 @@ try {
     $cartReference = $projection->cartReference($cartId);
     $snapshot = $reader->capture(2);
     checkWoo(count($snapshot) === 3, 'product, variation, active guest; expired omitted');
+    checkWoo($snapshot[0]['payload']['post_date_gmt'] !== null, 'native creation date for new-product ranking');
+    checkWoo($snapshot[2]['payload']['marketing_consent']['state'] === 'unknown', 'guest billing email is not consent');
+    $profileCalls = [];
+    $withCustomer = new WooSourceSnapshot($db, 'wp_2_', 2, str_repeat('ab', 32), 'synthetic-shop', null, $identity,
+        static function ($id, $scope) use (&$profileCalls): array {
+            $profileCalls[] = [$id, $scope];
+            return ['customer' => (object) ['email'=>'account@example.invalid','id'=>'999'], 'marketing_consent'=>[
+                'state'=>'granted','source'=>'woocommerce_account_preference','email'=>'account@example.invalid','scope'=>'2','changed_at'=>null]];
+        });
+    $withCustomer->capture(2);
+    checkWoo($profileCalls === [], 'guest session cannot choose registered identity using contact email');
+    $writer->exec("UPDATE wp_2_woocommerce_sessions SET session_key='7' WHERE session_key='private-guest-session'");
+    $registered = $withCustomer->capture(2)[2]['payload'];
+    checkWoo($profileCalls === [[7,2]] && $registered['marketing_consent']['state'] === 'granted', 'native registered session selects scoped account reader');
+    checkWoo($registered['account_customer']->email === 'account@example.invalid' && $registered['customer']->email === 'fixture@example.invalid', 'account identity separate from cart billing');
+    checkWoo($registered['account_customer']->id === '7', 'account ID comes from native session, not profile or billing');
+    $writer->exec("UPDATE wp_2_woocommerce_sessions SET session_key='private-guest-session' WHERE session_key='7'");
     checkWoo($snapshot[0]['payload']['native_meta']->_price === '83.21000000', 'stored price precision');
     checkWoo($snapshot[2]['payload']['currency_precision'] === 2, 'native unsaved decimal default');
     $writer->exec("INSERT INTO wp_2_options(option_name,option_value) VALUES ('woocommerce_price_num_decimals','0')");
@@ -174,7 +191,7 @@ try {
     };
     $pull();
     // Compatibility backup is ignored while posts remain authoritative.
-    $writer->exec("INSERT INTO wp_2_wc_orders VALUES (100,'wc-checkout-draft','USD','shop_order',999,NOW(),NOW())");
+    $writer->exec("INSERT INTO wp_2_wc_orders VALUES (100,'wc-checkout-draft','USD','shop_order',999,NOW(),NOW(),7)");
     $writer->prepare("INSERT INTO wp_2_wc_orders_meta(order_id,meta_key,meta_value) VALUES (100,'_ncwoo_cart_id',?)")->execute([$cartId]);
     checkWoo($reader->capture(2)[2]['payload']['status'] === 'active', 'HPOS backup ignored in posts mode');
     $writer->beginTransaction();
@@ -192,6 +209,11 @@ try {
     $writer->exec("DELETE FROM wp_2_woocommerce_sessions WHERE session_key='private-guest-session'");
     $second = $pull();
     checkWoo($second['records'][0]['payload']['session_status'] === 'absent', 'order survives session removal');
+    $writer->exec("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (100,'_customer_user','7')");
+    $profileCalls = [];
+    $afterCheckout = $withCustomer->capture(2)[2]['payload'];
+    checkWoo($profileCalls === [[7,2]] && $afterCheckout['account_customer']->email === 'account@example.invalid', 'posts account survives expired session');
+    checkWoo(!isset($afterCheckout['orders'][0]['customer_id']), 'native customer identifier not exported in orders');
     $proof = $identity->issue($cartReference);
     $writer->prepare("UPDATE wp_2_postmeta SET meta_value=? WHERE post_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartReference]);
     $writer->prepare("INSERT INTO wp_2_postmeta(post_id,meta_key,meta_value) VALUES (100,'_ncwoo_recovered_cart_proof',?)")->execute([$proof]);
@@ -213,6 +235,14 @@ try {
     $hpos = $reader->capture(2)[0]['payload'];
     checkWoo($hpos['order_storage'] === 'hpos' && count($hpos['orders']) === 1 && (float)$hpos['orders'][0]['total_amount'] === 999.0, 'HPOS authoritative even with divergent backup');
     checkWoo($hpos['status'] === 'order_present' && $hpos['orders'][0]['status'] === 'wc-checkout-draft', 'Blocks draft distinguished from paid conversion');
+    $profileCalls = [];
+    checkWoo($withCustomer->capture(2)[0]['payload']['marketing_consent']['state'] === 'granted'
+        && $profileCalls === [[7,2]], 'HPOS native customer uses same consent reader after session removal');
+    $unavailableCustomer = new WooSourceSnapshot($db, 'wp_2_', 2, str_repeat('ab', 32), 'synthetic-shop', null, $identity,
+        static function (): array { throw new RuntimeException('private-details-never-exported'); });
+    $safe = $unavailableCustomer->capture(2)[0]['payload'];
+    checkWoo($safe['marketing_consent']['state'] === 'unknown' && $safe['status'] === 'order_present'
+        && strpos(json_encode($safe), 'private-details') === false, 'unavailable consent does not fabricate grant or break native order evidence');
     $writer->exec("UPDATE wp_2_wc_orders SET status='wc-completed' WHERE id=100");
     checkWoo($reader->capture(2)[0]['payload']['orders'][0]['status'] === 'wc-completed', 'updated HPOS order observed');
     $writer->prepare("UPDATE wp_2_wc_orders_meta SET meta_value=? WHERE order_id=100 AND meta_key='_ncwoo_cart_id'")->execute([$cartReference]);

@@ -1,5 +1,7 @@
 # NeuroCheckout Connector for WooCommerce
 
+Version 1.0.12 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+
 ## Product details in Community emails
 
 Community's read-only snapshot requires PHP `pdo_mysql` (in addition to
@@ -20,6 +22,85 @@ and let Community synchronize before testing a new email. Previously sent
 emails are unchanged.
 
 ## Customer identity in Community
+
+### Recommendation consent (1.0.12)
+
+Customers can explicitly allow or withdraw product-recommendation emails in
+**My account → Account details**. The preference is optional and initially
+unchecked; installing/upgrading never opts in existing customers. The native
+account form and a separate user/store/email-bound nonce protect the change.
+Consent is per site, not network-wide. Changing an account email requires a new
+choice on a fresh form; billing emails do not inherit permission. Existing
+third-party newsletter preferences are not automatically imported.
+
+Signed local snapshots include the current account identity and an explicit
+granted/denied/unknown preference. Unknown or unavailable is not permission.
+Posts and HPOS orders can still identify their account after the cart session
+expires, without changing payment evidence, cart references or billing data.
+Cloud must recheck native consent, unsubscribe/suppression and all sending rules
+before delivery. This change alone does not activate recommendation campaigns.
+Product snapshots also export the actual creation date for novelty ranking.
+
+Validation: `php tests/marketing_consent_test.php`, the full isolated validator
+and disposable MariaDB source/recovery tests. These tests do not certify a real
+recommendation delivery. No live customer preference is changed by tests.
+
+### Complete account history (1.0.12)
+
+With matching Community/Cloud support, the existing signed source route can
+read a registered account's native order history independently of surviving
+cart sessions. Only the authoritative posts or HPOS store is read; guest orders
+sharing an email and orders from another site/account are not borrowed. The
+native account ID is included in the encrypted-local account identity, separately
+from billing data. Older snapshots without that ID cannot authorize this read.
+
+Each read uses its own repeatable-read, READ ONLY transaction, verifies InnoDB
+storage under metadata locks, and includes the current site-specific consent
+without changing it. Order totals, paid dates and native refunds remain separate
+facts; an order status is not proof of paid revenue. Native decimal precision,
+product/variation IDs and original/refund line relationships are preserved.
+The result stays transient. Existing HMAC, TLS, nonce and rate protections apply;
+the response binds the exact request and must be fresh. Unsupported storage,
+ambiguous data or more than 128 orders, 128 refunds, 512 lines or 64,000 bytes
+returns unavailable, never a truncated successful history. SQL statements are
+limited to one second and the complete native read to three cooperative seconds.
+
+Checks: `php tests/customer_history_protocol_test.php` (65 assertions) and
+`php tests/customer_history_sql_test.php /tmp/nc-source-mariadb.XXXX/mariadb.sock`
+(58 assertions), plus existing source/recovery tests. A read-only candidate bridge
+was compared with native WooCommerce 10.7.0 order services and the Community
+transport. It did not install the candidate, change customer consent, send an
+email or test the live HTTPS route. This capability is not an autonomous campaign
+sender; profile aggregation and final sending checks are still required.
+
+### Recipient-specific recommendation prices (1.0.12)
+
+The signed source route now supports a transient `customer_prices` read for up
+to 16 exact products and the registered account on the current site. Native
+customer identity, currency, saved billing/shipping/base tax address, VAT state,
+display precision and current sale/stock/held-stock evidence are checked. Simple
+products and fully specified variations are supported; variable-parent minimums,
+wildcard options, password-protected/hidden products and unavailable stock are not
+advertised. These are one-unit catalog offers, without shipping, cart coupons or
+a chosen pickup method, not a guaranteed checkout total.
+
+Tax calculation uses native Woo tax primitives with an explicit recipient; it
+does not impersonate a login or replace the current Woo customer/session. Unknown
+price/tax/data-store callbacks are refused rather than bypassed. Custom pricing,
+add-ons and tax extensions require separate qualification. A missing taxable
+address, expired sale price, context drift or three-second cooperative budget
+failure is unavailable, never a raw `_price` fallback. Existing source TLS/HMAC,
+nonce replay prevention, shop scope and rate limits remain mandatory. Replies
+bind the request hash, expire after 15 seconds and are limited to 16 KiB.
+
+Verification: 78 isolated reader checks, 38 signed-protocol checks, 8 read-only
+native offer comparisons on Woo 10.7.0, and 960 synthetic in-memory comparisons
+against its actual tax helpers (including compound taxes and rounding). Two
+candidate signed Community bridge reads and private Cloud validation passed,
+with replay refusal and no catalog/outbox records. No installed plugin, customer
+consent, order or SMTP was changed. This is not a live HTTPS/Cloud endpoint or
+real recommendation delivery test. Matching Community/Cloud changes and final
+pre-send checks are required before activation.
 
 Cart snapshots expose a boolean `customer_is_guest` derived from native session
 identity, not billing email or customer-supplied fields. Session keys remain
@@ -60,10 +141,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.11**:
+The current installable connector is **v1.0.12**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.11/neurocheckout-connector-woocommerce-1.0.11.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.11).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.12/neurocheckout-connector-woocommerce-1.0.12.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.12).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their

@@ -11,6 +11,39 @@ final class WooSourceSnapshotFactory
 {
     public static function create(int $scope, array $configuration): WooSourceSnapshot
     {
+        global $wpdb;
+        $connection=self::connection($scope,$configuration);
+        return new WooSourceSnapshot($connection, $wpdb->prefix, $scope, $configuration['secret'], $configuration['shopId'],
+            static function (int $id, int $thumbnailId): array {
+                return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
+                    'product_url' => (string) (get_permalink($id) ?: '')];
+            }, class_exists('NCWooConfig') ? WooRecoveryIdentity::fromConfig(new \NCWooConfig()) : null,
+            class_exists('NCWooMarketingConsent') ? [\NCWooMarketingConsent::class, 'snapshot'] : null);
+    }
+
+    public static function customerHistory(int $scope,array $configuration): WooCustomerOrderHistory
+    {
+        global $wpdb;
+        $connection=self::connection($scope,$configuration);
+        // Custom/shared user tables are never silently replaced by guessed names.
+        if ($wpdb->users!==$wpdb->base_prefix.'users' || $wpdb->usermeta!==$wpdb->base_prefix.'usermeta'
+            || defined('CUSTOM_USER_TABLE') || defined('CUSTOM_USER_META_TABLE')) { throw new RuntimeException('customer_history_unavailable'); }
+        if (is_multisite()) {
+            $site=get_site($scope);
+            if (!$site || $site->archived || $site->spam || $site->deleted) { throw new RuntimeException('customer_history_unavailable'); }
+        }
+        return new WooCustomerOrderHistory($connection,$wpdb->prefix,$wpdb->users,$wpdb->usermeta,$scope,is_multisite());
+    }
+
+    public static function customerPrices(int $scope, array $configuration): WooCustomerProductPrices
+    {
+        // Retain the source's existing native runtime/custom-store guards.
+        self::connection($scope, $configuration);
+        return new WooCustomerProductPrices();
+    }
+
+    private static function connection(int $scope,array $configuration): PDO
+    {
         global $wpdb, $wp_filter;
         if (!self::hasPdoMysql()) {
             throw new RuntimeException('source_dependency_missing_pdo_mysql');
@@ -79,13 +112,8 @@ final class WooSourceSnapshotFactory
             if (!defined($constant)) { throw new RuntimeException('source_schema_unavailable'); }
         }
         [$dsn, $user, $password] = self::connectionParameters(DB_HOST, DB_NAME, DB_USER, DB_PASSWORD);
-        $connection = new PDO($dsn, $user, $password, [PDO::ATTR_TIMEOUT => 2,
+        return new PDO($dsn, $user, $password, [PDO::ATTR_TIMEOUT => 2,
             PDO::MYSQL_ATTR_MULTI_STATEMENTS => false, PDO::ATTR_PERSISTENT => false]);
-        return new WooSourceSnapshot($connection, $wpdb->prefix, $scope, $configuration['secret'], $configuration['shopId'],
-            static function (int $id, int $thumbnailId): array {
-                return ['image_url' => $thumbnailId > 0 ? (string) (wp_get_attachment_image_url($thumbnailId, 'woocommerce_thumbnail') ?: '') : '',
-                    'product_url' => (string) (get_permalink($id) ?: '')];
-            }, class_exists('NCWooConfig') ? WooRecoveryIdentity::fromConfig(new \NCWooConfig()) : null);
     }
 
     public static function hasPdoMysql(): bool
