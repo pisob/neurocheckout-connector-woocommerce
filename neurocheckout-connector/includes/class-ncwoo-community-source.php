@@ -62,6 +62,10 @@ final class NCWooCommunitySource
             (string) ($_SERVER['REQUEST_URI'] ?? ''), SourcePullGateway::serverHeaders($_SERVER),
             $raw, is_ssl(),
             static function ($input, $scope, $configuration, $directory) use ($raw): array {
+                if (($input['operation'] ?? null)==='customer_history_index') {
+                    return ['schema'=>1,'shopId'=>$input['shopId'],'operation'=>'customer_history_index',
+                        'requestHash'=>hash('sha256',$raw),'index'=>WooSourceSnapshotFactory::customerHistory($scope,$configuration)->index($scope,$input)];
+                }
                 if (($input['operation'] ?? null) === 'customer_prices') {
                     $prices = WooSourceSnapshotFactory::customerPrices($scope, $configuration)
                         ->read($scope, (int) $input['customerId'], $input['customerEmail'], $input['productIds'], $input['currency']);
