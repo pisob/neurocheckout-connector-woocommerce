@@ -1,6 +1,43 @@
 # NeuroCheckout Connector for WooCommerce
 
-Version 1.0.12 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
+## Native history v2 (1.0.13)
+
+The signed account-history response adds nullable `discount_total` to every
+order. Native discounts retain decimal precision; unavailable values stay null.
+PrestaShop exports native tax-inclusive discounts, WooCommerce exports its native
+order discount field (HPOS/posts), and Magento exports the magnitude of its signed
+native discount. No paid/refunded value or preference is invented by the connector.
+Older v1 history remains valid for compatible readers, with discount evidence
+unknown. Use Community preview.43 and the coordinated Cloud release. Existing
+native-cart, consent, transaction, size and timing guards still apply.
+
+## Native account carts (1.0.13)
+
+The signed `customer_carts` operation checks the exact registered account and
+blog, including multisite membership and native recommendation consent. It reads
+both `_woocommerce_persistent_cart_<blog>` and the account's unexpired native
+WooCommerce session; either nonempty cart blocks competing recommendation
+preparation in matching candidate Cloud/Community code. Expired sessions do not
+erase a still-persisted account cart. Anonymous sessions and uncommitted browser
+state are outside this contract.
+
+Reads use an owned read-only repeatable InnoDB snapshot, bounded SQL/lock waits
+and a three-second cooperative budget. Serialized native values are parsed as
+bounded scalars/arrays only (64 KiB/source, 128 cart lines); objects, references,
+duplicates, invalid quantities, custom storage/metadata hooks and partial schemas
+are refused. No session is initialized, merged or cleaned up. The response contains
+only identity, consent, completeness, read time and cart presence, not line items.
+It reuses source HMAC/nonces/HTTPS and limits replies to 4 KiB/15-second freshness.
+
+This contract requires matching Community preview.43 and coordinated Cloud support, not
+an activation of autonomous sending or atomic checkout/SMTP coordination.
+Validation: 37 signed protocol assertions, six runtime-hook guards and 43 real
+disposable SQL assertions, plus existing validator and SQL regression suites.
+Synthetic fixtures cover account/blog separation, saved/session precedence,
+malformed data, snapshot concurrency, read-only enforcement and bounded failures.
+Installed-store HTTP and real recommendation delivery remain unqualified.
+
+Version 1.0.13 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent campaigns are controlled by the coordinated Cloud worker; installing this connector never enables sending or changes consent.
 
 ## Product details in Community emails
 
@@ -23,7 +60,7 @@ emails are unchanged.
 
 ## Customer identity in Community
 
-### Recommendation consent (1.0.12)
+### Recommendation consent (1.0.13)
 
 Customers can explicitly allow or withdraw product-recommendation emails in
 **My account → Account details**. The preference is optional and initially
@@ -45,7 +82,7 @@ Validation: `php tests/marketing_consent_test.php`, the full isolated validator
 and disposable MariaDB source/recovery tests. These tests do not certify a real
 recommendation delivery. No live customer preference is changed by tests.
 
-### Complete account history (1.0.12)
+### Complete account history (1.0.13)
 
 With matching Community/Cloud support, the existing signed source route can
 read a registered account's native order history independently of surviving
@@ -73,7 +110,7 @@ transport. It did not install the candidate, change customer consent, send an
 email or test the live HTTPS route. This capability is not an autonomous campaign
 sender; profile aggregation and final sending checks are still required.
 
-### Recipient-specific recommendation prices (1.0.12)
+### Recipient-specific recommendation prices (1.0.13)
 
 The signed source route now supports a transient `customer_prices` read for up
 to 16 exact products and the registered account on the current site. Native
@@ -141,10 +178,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.12**:
+The current installable connector is **v1.0.13**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.12/neurocheckout-connector-woocommerce-1.0.12.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.12).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.13/neurocheckout-connector-woocommerce-1.0.13.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.13).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their

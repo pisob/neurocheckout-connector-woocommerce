@@ -21,6 +21,15 @@ final class WooSourceSnapshotFactory
             class_exists('NCWooMarketingConsent') ? [\NCWooMarketingConsent::class, 'snapshot'] : null);
     }
 
+    public static function customerCarts(int $scope,array $configuration): WooCustomerOrderHistory
+    {
+        foreach (['get_user_metadata','add_user_metadata','update_user_metadata','delete_user_metadata',
+            'woocommerce_persistent_cart_enabled','woocommerce_cart_session_initialize'] as $hook) {
+            if (has_filter($hook)!==false) { throw new RuntimeException('customer_carts_unavailable'); }
+        }
+        return self::customerHistory($scope,$configuration);
+    }
+
     public static function customerHistory(int $scope,array $configuration): WooCustomerOrderHistory
     {
         global $wpdb;

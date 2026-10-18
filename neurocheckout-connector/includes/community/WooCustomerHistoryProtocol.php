@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 namespace NeuroCheckout\WooCommerce\Community;
+require_once __DIR__ . '/NativeHistoryV2.php';
 
 /** Signed native facts only: never interpret status or a date as paid revenue. */
 final class WooCustomerHistoryProtocol
@@ -22,6 +23,7 @@ final class WooCustomerHistoryProtocol
     }
     public static function history($h, array $input): void
     {
+        $h=NativeHistoryV2::legacy($h,'woocommerce-customer-history-v1');
         if (!self::keys($h,['schema','blog_id','customer_id','customer_email','customer_created_at','read_at','complete',
                 'order_storage','order_count','orders','marketing_consent']) || $h['schema']!=='woocommerce-customer-history-v1'
             || $h['complete']!==true || !is_int($h['blog_id']) || (string)$h['blog_id']!==$input['blogId']

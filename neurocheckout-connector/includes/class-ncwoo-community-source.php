@@ -69,6 +69,13 @@ final class NCWooCommunitySource
                     return ['schema'=>1, 'shopId'=>$input['shopId'], 'operation'=>'customer_prices',
                         'requestHash'=>hash('sha256', $raw), 'prices'=>$prices];
                 }
+                if (($input['operation'] ?? null) === 'customer_carts') {
+                    $carts=WooSourceSnapshotFactory::customerCarts($scope,$configuration)
+                        ->read($scope,(int)$input['customerId'],$input['customerEmail'],true);
+                    if ((int)get_current_blog_id()!==$scope) { throw new RuntimeException('customer_carts_unavailable'); }
+                    return ['schema'=>1,'shopId'=>$input['shopId'],'operation'=>'customer_carts',
+                        'requestHash'=>hash('sha256',$raw),'carts'=>$carts];
+                }
                 if (($input['operation'] ?? null) === 'customer_history') {
                     $history = WooSourceSnapshotFactory::customerHistory($scope, $configuration)
                         ->read($scope, (int) $input['customerId'], $input['customerEmail']);

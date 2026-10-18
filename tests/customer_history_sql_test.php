@@ -50,7 +50,7 @@ try {
         'postmeta'=>'meta_id BIGINT AUTO_INCREMENT PRIMARY KEY,post_id BIGINT,meta_key VARCHAR(255),meta_value LONGTEXT',
         'wc_orders'=>'id BIGINT PRIMARY KEY,parent_order_id BIGINT DEFAULT 0,customer_id BIGINT DEFAULT 0,type VARCHAR(20),status VARCHAR(20),currency VARCHAR(10),total_amount DECIMAL(26,8),date_created_gmt DATETIME,date_updated_gmt DATETIME',
         'wc_orders_meta'=>'id BIGINT AUTO_INCREMENT PRIMARY KEY,order_id BIGINT,meta_key VARCHAR(255),meta_value TEXT',
-        'wc_order_operational_data'=>'id BIGINT AUTO_INCREMENT PRIMARY KEY,order_id BIGINT UNIQUE,date_paid_gmt DATETIME',
+        'wc_order_operational_data'=>'id BIGINT AUTO_INCREMENT PRIMARY KEY,order_id BIGINT UNIQUE,date_paid_gmt DATETIME,discount_total_amount DECIMAL(26,8) DEFAULT 0',
         'woocommerce_order_items'=>'order_item_id BIGINT PRIMARY KEY,order_id BIGINT,order_item_type VARCHAR(200)',
         'woocommerce_order_itemmeta'=>'meta_id BIGINT AUTO_INCREMENT PRIMARY KEY,order_item_id BIGINT,meta_key VARCHAR(255),meta_value LONGTEXT',
     ];
@@ -101,6 +101,7 @@ try {
     sqlCheck($posts['order_storage']==='posts' && $posts['complete']===true,'authoritative posts storage');
     sqlCheck($posts['marketing_consent']==='granted','same-snapshot native scoped consent');
     sqlCheck($posts['orders'][0]['date_paid_gmt']===null && !array_key_exists('total_paid',$posts['orders'][0]),'unpaid order never upgraded into revenue');
+    sqlCheck($posts['schema']==='woocommerce-customer-history-v2' && $posts['orders'][0]['discount_total']===null,'missing native discount stays unknown');
     sqlCheck($posts['orders'][0]['total']==='48.12500000','native decimal not rounded');
     sqlCheck(count($posts['orders'][0]['items'])===1 && $posts['orders'][0]['items'][0]['variation_id']==='11','native product variant separate from shipping');
     sqlCheck($posts['orders'][0]['refunds'][0]['amount']==='24.06250000' && $posts['orders'][0]['refunds'][0]['payment_refunded']===false,'manual refund kept distinct from payment refund');
@@ -173,6 +174,7 @@ try {
     $hpos=$read();
     sqlCheck($hpos['order_storage']==='hpos' && $hpos['order_count']===1 && $hpos['orders'][0]['order_id']==='200','HPOS ignores conflicting posts backup');
     sqlCheck($hpos['orders'][0]['date_paid_gmt']==='2020-01-01 12:00:00','native HPOS paid date');
+    sqlCheck($hpos['orders'][0]['discount_total']==='0.00000000','explicit HPOS zero discount');
     sqlCheck($hpos['orders'][0]['refunds'][0]['amount']==='24.06250000' && $hpos['orders'][0]['refunds'][0]['payment_refunded']===true,'HPOS uses refund metadata, not negative header total');
     $writer->exec('UPDATE wp_2_wc_order_operational_data SET order_id=999 WHERE order_id=200'); sqlReject($read,'missing HPOS operational row');
     $writer->exec('UPDATE wp_2_wc_order_operational_data SET order_id=200 WHERE order_id=999');
