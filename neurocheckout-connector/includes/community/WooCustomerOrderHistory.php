@@ -87,7 +87,7 @@ final class WooCustomerOrderHistory
                 }
             }
             unset($order);
-            $result=['schema'=>'woocommerce-customer-history-v1','blog_id'=>$scope,'customer_id'=>$customer,
+            $result=['schema'=>'woocommerce-customer-history-v2','blog_id'=>$scope,'customer_id'=>$customer,
                 'customer_email'=>$person['user_email'],'customer_created_at'=>$person['user_registered'],
                 'read_at'=>gmdate('Y-m-d\TH:i:s\Z'),'complete'=>true,'order_storage'=>$hpos?'hpos':'posts',
                 'order_count'=>count($orders),'orders'=>$orders,'marketing_consent'=>$this->consent($customer,$person['user_email'])];
@@ -150,7 +150,8 @@ final class WooCustomerOrderHistory
     {
         if ($hpos) {
             $rows=$this->rows('SELECT CAST(o.id AS CHAR) order_id,o.status,o.date_created_gmt created_at,o.date_updated_gmt updated_at,'
-                .'o.currency,CAST(o.total_amount AS CHAR) total,d.date_paid_gmt,CAST(d.order_id AS CHAR) operational_order_id FROM '.$this->table('wc_orders').' o LEFT JOIN '
+                .'o.currency,CAST(o.total_amount AS CHAR) total,d.date_paid_gmt,CAST(d.discount_total_amount AS CHAR) discount_total,'
+                .'CAST(d.order_id AS CHAR) operational_order_id FROM '.$this->table('wc_orders').' o LEFT JOIN '
                 .$this->table('wc_order_operational_data')." d ON d.order_id=o.id WHERE o.type='shop_order' AND o.customer_id=? ORDER BY o.id",[$customer],128);
             foreach ($rows as &$row) {
                 if ($row['operational_order_id']!==$row['order_id']) { self::fail(); }
@@ -162,11 +163,12 @@ final class WooCustomerOrderHistory
         $rows=$this->rows('SELECT CAST(p.ID AS CHAR) order_id,p.post_status status,p.post_date_gmt created_at,p.post_modified_gmt updated_at FROM '
             .$this->table('posts')." p WHERE p.post_type='shop_order' AND EXISTS (SELECT 1 FROM ".$this->table('postmeta')
             ." m WHERE m.post_id=p.ID AND m.meta_key='_customer_user' AND m.meta_value=?) ORDER BY p.ID",[(string)$customer],128);
-        $meta=$this->metadata('postmeta','post_id',array_column($rows,'order_id'),['_customer_user','_order_currency','_order_total','_date_paid']);
+        $meta=$this->metadata('postmeta','post_id',array_column($rows,'order_id'),['_customer_user','_order_currency','_order_total','_date_paid','_cart_discount']);
         foreach ($rows as &$row) {
             $m=$meta[$row['order_id']]??[];
             if (($m['_customer_user']??null)!==(string)$customer) { self::fail(); }
             $row['currency']=$m['_order_currency']??null; $row['total']=$m['_order_total']??null;
+            $row['discount_total']=$m['_cart_discount']??null;
             $paid=$m['_date_paid']??'';
             if ($paid!=='' && $paid!=='0' && !preg_match('/^[1-9][0-9]{0,9}$/D',$paid)) { self::fail(); }
             // Missing dates are unknown, never proof of no payment or zero paid amount.

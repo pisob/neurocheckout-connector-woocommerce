@@ -31,6 +31,10 @@ $history=['schema'=>'woocommerce-customer-history-v1','blog_id'=>2,'customer_id'
 WooCustomerHistoryProtocol::request($input,'synthetic-shop');
 WooCustomerHistoryProtocol::history($history,$input);
 historyCheck(true,'complete native facts accepted without paid inference');
+$v2=$history;$v2['schema']='woocommerce-customer-history-v2';
+foreach([null,'0','7.12500000'] as $discount){$v2['orders'][0]['discount_total']=$discount;WooCustomerHistoryProtocol::history($v2,$input);historyCheck(true,'v2 discount preserved');}
+foreach([true,2,'-1','1e2',str_repeat('9',27)] as $discount){$bad=$v2;$bad['orders'][0]['discount_total']=$discount;historyReject(static function()use($bad,$input){WooCustomerHistoryProtocol::history($bad,$input);},'invalid v2 discount');}
+$bad=$v2;unset($bad['orders'][0]['discount_total']);historyReject(static function()use($bad,$input){WooCustomerHistoryProtocol::history($bad,$input);},'missing v2 discount');
 foreach (['schema'=>2,'shopId'=>'foreign-shop','operation'=>'other','blogId'=>'02','customerId'=>47,
     'customerEmail'=>'bad\nemail@example.invalid','extra'=>true] as $key=>$value) {
     $bad=array_replace($input,[$key=>$value]);
