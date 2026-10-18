@@ -103,6 +103,13 @@ final class WooCustomerProductPrices
                     if ($name === 'woocommerce_after_calculate_totals' && is_array($fn) && is_object($fn[0])
                         && in_array(get_class($fn[0]) . '::' . $fn[1], ['WC_Cart_Session::set_session',
                             'NCWooEventService::maybe_enqueue_shipping_cost_snapshot'], true)) { continue; }
+                    // REST also loads native tax-onboarding observers. They
+                    // react to rate writes, which this reader never performs;
+                    // they neither calculate nor filter a recipient's tax.
+                    if (is_array($fn) && is_object($fn[0])
+                        && get_class($fn[0]) === 'Automattic\\WooCommerce\\Admin\\Features\\OnboardingTasks\\Tasks\\Tax'
+                        && (($name === 'woocommerce_tax_rate_added' && $fn[1] === 'on_tax_rate_added')
+                            || ($name === 'woocommerce_tax_rate_deleted' && $fn[1] === 'on_tax_rate_deleted'))) { continue; }
                     self::fail();
                 }
             }
