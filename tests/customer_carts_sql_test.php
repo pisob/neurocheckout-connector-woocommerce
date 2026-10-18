@@ -76,11 +76,12 @@ try {
     }
     $writer->exec("DELETE FROM wp_usermeta WHERE meta_key='wp_2_capabilities'");refuseCart($read);
     $put->execute([7,'wp_2_capabilities',serialize(['customer'=>true])]);
+    $deleteConsent=$writer->prepare('DELETE FROM wp_usermeta WHERE meta_key=?');
     foreach (['granted','denied'] as $state) {
-        $consent['state']=$state;$writer->exec("DELETE FROM wp_usermeta WHERE meta_key='_ncwoo_marketing_consent_2'");
+        $consent['state']=$state;$deleteConsent->execute(['_ncwoo_marketing_consent_2']);
         $put->execute([7,'_ncwoo_marketing_consent_2',serialize($consent)]);checkCart($read()['marketing_consent']===$state);
     }
-    $writer->exec("DELETE FROM wp_usermeta WHERE meta_key='_ncwoo_marketing_consent_2'");checkCart($read()['marketing_consent']==='unknown');
+    $deleteConsent->execute(['_ncwoo_marketing_consent_2']);checkCart($read()['marketing_consent']==='unknown');
     $db->beginTransaction();refuseCart($read);checkCart($db->inTransaction());$db->rollBack();
     $db->onCart=static function($connection) {try{$connection->exec('UPDATE wp_users SET user_status=1');}catch(PDOException $e){checkCart(true);return;}throw new RuntimeException('not read-only');};
     $read();checkCart(!$db->inTransaction());
