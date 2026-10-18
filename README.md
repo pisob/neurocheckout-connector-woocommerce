@@ -1,5 +1,23 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Scheduled local order history
+
+The signed `customer_history_index` operation discovers registered native accounts
+with orders, including accounts whose checkout cart no longer exists. It pages
+eight accounts at a time within the configured native store; a fixed account-ID
+ceiling prevents new arrivals from changing a running pass. Community retrieves
+each account through the existing authenticated history reader and stores the
+result in its encrypted local vault. The first complete source synchronization
+starts the initial pass; subsequent passes are due seven days after completion.
+Failed accounts retain their cursor and retry; a partial pass is never reported
+as complete. Installing this connector does not enable email campaigns.
+
+The existing history contract covers registered accounts only (not guest orders),
+with a maximum of 128 orders, 512 lines and 64 KiB per account. Overflow fails
+explicitly, without truncation. Orders retain their native payment/refund facts.
+
+
+
 ## Native REST recipient prices (1.0.14)
 
 Signed REST price reads now recognize WooCommerce's two built-in tax onboarding
@@ -191,10 +209,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-Release **v1.0.14**:
+Release **v1.0.15**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.14/neurocheckout-connector-woocommerce-1.0.14.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.14).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.15/neurocheckout-connector-woocommerce-1.0.15.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.15).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their

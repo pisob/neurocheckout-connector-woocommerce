@@ -57,7 +57,10 @@ final class SourcePullProtocol
             throw new RuntimeException('source_unauthorized');
         }
         $input = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
-        if (is_array($input) && ($input['operation'] ?? null) === 'customer_prices') {
+        if (is_array($input) && ($input['operation'] ?? null) === 'customer_history_index') {
+            require_once __DIR__ . '/CustomerHistoryIndex.php';
+            CustomerHistoryIndex::request($input,$shopId);
+        } elseif (is_array($input) && ($input['operation'] ?? null) === 'customer_prices') {
             if (self::platformForPath($path) !== 'woocommerce') { throw new RuntimeException('source_invalid'); }
             try { WooCustomerPriceProtocol::request($input, $shopId); }
             catch (\Throwable $error) { throw new RuntimeException('source_invalid'); }

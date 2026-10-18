@@ -31,6 +31,13 @@ final class WooCustomerOrderHistory
         $db->setAttribute(PDO::ATTR_EMULATE_PREPARES,false);
     }
 
+    public function index(int $scope, array $input): array
+    {
+        require_once __DIR__ . '/CustomerHistoryIndex.php';
+        if ($scope!==$this->scope) { self::fail(); }
+        return CustomerHistoryIndex::read($this->db,'woocommerce',$this->prefix,$scope,$input,$this->users,$this->usermeta,$this->multisite);
+    }
+
     public function read(int $scope, int $customer, string $email, bool $activeCarts=false): array
     {
         $owned=false;
