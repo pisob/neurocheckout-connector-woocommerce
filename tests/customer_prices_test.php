@@ -122,6 +122,20 @@ $user->user_status=1;rejectPrice(static function(){readPrice();},'disabled accou
 $multi=true;$member=false;rejectPrice(static function(){readPrice();},'foreign site membership');$member=true;$multi=false;
 $inert=(object)['callbacks'=>[[['function'=>[new WC_Deprecated_Filter_Hooks(),'maybe_handle_deprecated_hook']]]]];
 $wp_filter=['woocommerce_product_get_price'=>$inert];availablePrice(33,'inert native deprecation bridge');
+require_once __DIR__.'/fixtures/native-tax-observer.php';
+$taxTask=new \Automattic\WooCommerce\Admin\Features\OnboardingTasks\Tasks\Tax();
+$wp_filter=[];
+foreach (['added','deleted'] as $event) {
+ $wp_filter['woocommerce_tax_rate_'.$event]=(object)['callbacks'=>[[['function'=>[$taxTask,'on_tax_rate_'.$event]]]]];
+}
+availablePrice(33,'REST native tax onboarding observers do not affect one-unit prices or run');
+$wp_filter['woocommerce_product_get_price']=(object)['callbacks'=>[[['function'=>static function(){}]]]];
+rejectPrice(static function(){readPrice();},'REST observers never allow a custom price callback');
+$wp_filter=['woocommerce_tax_rate_added'=>(object)['callbacks'=>[[['function'=>static function(){}]]]]];
+rejectPrice(static function(){readPrice();},'unqualified tax observer remains blocked');
+$wp_filter=['woocommerce_tax_rate_deleted'=>(object)['callbacks'=>[[['function'=>[$taxTask,'on_tax_rate_added']]]]]];
+rejectPrice(static function(){readPrice();},'mismatched tax observer hook remains blocked');
+
 foreach(['woocommerce_get_price','woocommerce_product_get_price','woocommerce_customer_loaded','woocommerce_get_price_including_tax','woocommerce_adjust_non_base_location_prices','woocommerce_currency','woocommerce_product_data_store','woocommerce_before_calculate_totals','pre_option','get_user_metadata'] as $hook){
  $wp_filter=[$hook=>(object)['callbacks'=>[[['function'=>static function(){}]]]]];rejectPrice(static function(){readPrice();},'unknown runtime hook '.$hook);
 }

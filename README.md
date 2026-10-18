@@ -1,5 +1,18 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Native REST recipient prices (1.0.14)
+
+Signed REST price reads now recognize WooCommerce's two built-in tax onboarding
+observers. These callbacks only react to adding/deleting tax rates; a price read
+never invokes them or changes a rate. Their REST registration previously caused
+otherwise valid native prices to be refused. Exact hook/class/method matching
+retains rejection of unknown price, tax, metadata and storage callbacks.
+
+Regression coverage reproduces the refusal, verifies unchanged recipient tax and
+checks that observers are never invoked. The candidate also passes a native
+WooCommerce REST-context read. Installed HTTPS acceptance is recorded separately
+from this candidate check; neither changes customer consent or enables sending.
+
 ## Native history v2 (1.0.13)
 
 The signed account-history response adds nullable `discount_total` to every
@@ -178,10 +191,10 @@ NeuroCheckout Community.
 
 ## Availability
 
-The current installable connector is **v1.0.13**:
+Release **v1.0.14**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.13/neurocheckout-connector-woocommerce-1.0.13.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.13).
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.14/neurocheckout-connector-woocommerce-1.0.14.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.14).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
