@@ -1,5 +1,31 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Native account carts (candidate, 2026-10-18)
+
+The signed `customer_carts` operation checks the exact registered account and
+blog, including multisite membership and native recommendation consent. It reads
+both `_woocommerce_persistent_cart_<blog>` and the account's unexpired native
+WooCommerce session; either nonempty cart blocks competing recommendation
+preparation in matching candidate Cloud/Community code. Expired sessions do not
+erase a still-persisted account cart. Anonymous sessions and uncommitted browser
+state are outside this contract.
+
+Reads use an owned read-only repeatable InnoDB snapshot, bounded SQL/lock waits
+and a three-second cooperative budget. Serialized native values are parsed as
+bounded scalars/arrays only (64 KiB/source, 128 cart lines); objects, references,
+duplicates, invalid quantities, custom storage/metadata hooks and partial schemas
+are refused. No session is initialized, merged or cleaned up. The response contains
+only identity, consent, completeness, read time and cart presence, not line items.
+It reuses source HMAC/nonces/HTTPS and limits replies to 4 KiB/15-second freshness.
+
+This is an unreleased candidate requiring matching Community/Cloud support, not
+an activation of autonomous sending or atomic checkout/SMTP coordination.
+Validation: 37 signed protocol assertions, six runtime-hook guards and 43 real
+disposable SQL assertions, plus existing validator and SQL regression suites.
+Synthetic fixtures cover account/blog separation, saved/session precedence,
+malformed data, snapshot concurrency, read-only enforcement and bounded failures.
+Installed-store HTTP and real recommendation delivery remain unqualified.
+
 Version 1.0.12 delivers native account/consent facts and bounded recipient-price and order-history reads for matching Community/Cloud support. Existing customer consent is preserved. Independent recommendation campaigns remain incomplete and are not enabled by installing this release.
 
 ## Product details in Community emails

@@ -61,6 +61,11 @@ final class SourcePullProtocol
             if (self::platformForPath($path) !== 'woocommerce') { throw new RuntimeException('source_invalid'); }
             try { WooCustomerPriceProtocol::request($input, $shopId); }
             catch (\Throwable $error) { throw new RuntimeException('source_invalid'); }
+        } elseif (is_array($input) && ($input['operation'] ?? null) === 'customer_carts') {
+            if (self::platformForPath($path) !== 'woocommerce') { throw new RuntimeException('source_invalid'); }
+            require_once __DIR__ . '/CustomerCartsProtocol.php';
+            try { CustomerCartsProtocol::request($input, $shopId); }
+            catch (\Throwable $error) { throw new RuntimeException('source_invalid'); }
         } elseif (is_array($input) && ($input['operation'] ?? null) === 'customer_history') {
             if (self::platformForPath($path) !== 'woocommerce') { throw new RuntimeException('source_invalid'); }
             try { WooCustomerHistoryProtocol::request($input, $shopId); }

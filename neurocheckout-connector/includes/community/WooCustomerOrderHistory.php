@@ -5,6 +5,8 @@ namespace NeuroCheckout\WooCommerce\Community;
 use PDO;
 use RuntimeException;
 
+require_once __DIR__ . '/CustomerCartsProtocol.php';
+
 /** Complete bounded account facts, never a sample of surviving cart sessions. */
 final class WooCustomerOrderHistory
 {
@@ -29,7 +31,7 @@ final class WooCustomerOrderHistory
         $db->setAttribute(PDO::ATTR_EMULATE_PREPARES,false);
     }
 
-    public function read(int $scope, int $customer, string $email): array
+    public function read(int $scope, int $customer, string $email, bool $activeCarts=false): array
     {
         $owned=false;
         try {
@@ -38,6 +40,7 @@ final class WooCustomerOrderHistory
             $this->started=microtime(true);
             $this->db->exec(stripos((string)$this->db->getAttribute(PDO::ATTR_SERVER_VERSION),'mariadb')!==false
                 ? 'SET SESSION max_statement_time=1' : 'SET SESSION MAX_EXECUTION_TIME=1000');
+            if ($activeCarts) { $this->db->exec('SET SESSION lock_wait_timeout=1'); }
             $this->db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
             $this->db->exec('SET TRANSACTION READ ONLY');
             // PDO must own the transaction (also on PHP 7.4). The first SELECT
@@ -51,7 +54,7 @@ final class WooCustomerOrderHistory
             $hpos=$storage==='yes';
             $tables=$hpos ? ['wc_orders','wc_orders_meta','wc_order_operational_data'] : ['posts','postmeta'];
             $tables=array_merge($tables,['woocommerce_order_items','woocommerce_order_itemmeta']);
-            $this->engines(array_map(function($name){return $this->prefix.$name;},$tables));
+            $this->engines(array_map(function($name){return $this->prefix.$name;},$activeCarts ? ['woocommerce_sessions'] : $tables));
             $people=$this->rows('SELECT ID,user_email,user_registered FROM `'.$this->users.'` WHERE ID=? AND user_status=0'
                 .($this->multisite?' AND spam=0 AND deleted=0':''),[$customer],1);
             if (count($people)!==1 || strcasecmp($people[0]['user_email'],$email)!==0) { self::fail(); }
@@ -61,6 +64,12 @@ final class WooCustomerOrderHistory
                 $roles=count($membership)===1 && strlen($membership[0]['meta_value'])<=4096
                     ? BoundedPhpValueReader::decode($membership[0]['meta_value']) : null;
                 if (!is_array($roles) || !in_array(true,$roles,true)) { self::fail(); }
+            }
+            if ($activeCarts) {
+                $active=$this->hasActiveCart($customer);
+                $result=CustomerCartsProtocol::result(['blogId'=>(string)$scope,'customerId'=>(string)$customer,
+                    'customerEmail'=>$person['user_email']],$active,$this->consent($customer,$person['user_email']));
+                $this->checkTime(); return $result;
             }
             $orders=$this->orders($hpos,$customer);
             $ids=array_column($orders,'order_id');
@@ -91,6 +100,50 @@ final class WooCustomerOrderHistory
                 catch (\Throwable $error) { self::fail(); }
             }
         }
+    }
+
+    private function hasActiveCart(int $customer): bool
+    {
+        // Inspect native persisted carts only. Never initialize WC()->cart or a
+        // shopper session, and never execute serialized objects or metadata hooks.
+        $saved=$this->rows('SELECT LEFT(meta_value,65537) value FROM `'.$this->usermeta.'`'
+            .' WHERE user_id=? AND meta_key=?',[$customer,'_woocommerce_persistent_cart_'.$this->scope],1);
+        $sessions=$this->rows('SELECT LEFT(session_value,65537) value,session_expiry FROM '.$this->table('woocommerce_sessions')
+            .' WHERE session_key=?',[(string)$customer],1);
+        $active=false;
+        if ($saved) {
+            $value=BoundedPhpValueReader::decode($saved[0]['value']);
+            if (!is_array($value) || array_keys($value)!==['cart']) { self::fail(); }
+            $active=$this->nonemptyCart($value['cart']);
+        }
+        if ($sessions) {
+            $expiry=(string)$sessions[0]['session_expiry'];
+            if (!preg_match('/^[1-9][0-9]{0,11}$/D',$expiry) || (int)$expiry>253402300799) { self::fail(); }
+            if ((int)$expiry>time()) {
+                $value=BoundedPhpValueReader::decode($sessions[0]['value']);
+                if (!is_array($value)) { self::fail(); }
+                $cart=array_key_exists('cart',$value) ? $value['cart'] : [];
+                if (is_string($cart)) { $cart=BoundedPhpValueReader::decode($cart); }
+                // Do not short-circuit validation of one source because the
+                // other already contains a cart.
+                $sessionActive=$this->nonemptyCart($cart);
+                $active=$active || $sessionActive;
+            }
+        }
+        return $active;
+    }
+    private function nonemptyCart($cart): bool
+    {
+        if (!is_array($cart) || count($cart)>128) { self::fail(); }
+        $active=false;
+        foreach ($cart as $line) {
+            if (!is_array($line) || !isset($line['quantity']) || is_bool($line['quantity'])
+                || (!is_string($line['quantity']) && !is_int($line['quantity']) && !is_float($line['quantity']))) { self::fail(); }
+            $quantity=(string)$line['quantity'];
+            if (!preg_match('/^\d{1,10}(?:\.\d{1,8})?$/D',$quantity)) { self::fail(); }
+            $active=$active || (float)$quantity>0;
+        }
+        return $active;
     }
 
     private function orders(bool $hpos, int $customer): array

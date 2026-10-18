@@ -25,3 +25,5 @@ done
 php neurocheckout-connector/tests/community_source_snapshot_test.php "$fixture_dir/mariadb.sock"
 php tests/recovery_sql_test.php "$fixture_dir/mariadb.sock"
 php tests/customer_history_sql_test.php "$fixture_dir/mariadb.sock"
+
+php tests/customer_carts_sql_test.php "$fixture_dir/mariadb.sock"

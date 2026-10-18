@@ -41,15 +41,17 @@ final class SourcePullGateway
                     return self::guard($statePath, $nonce, $ttl);
                 }, true, $configuration['environment']);
             $history = ($input['operation'] ?? null) === 'customer_history';
+            $carts = ($input['operation'] ?? null) === 'customer_carts';
             $prices = ($input['operation'] ?? null) === 'customer_prices';
-            if (($history || $prices) && $input['blogId'] !== (string) $nativeScope) {
+            if (($history || $prices || $carts) && $input['blogId'] !== (string) $nativeScope) {
                 return self::error(403, 'source_forbidden');
             }
             if ($exporter === null) {
                 return self::error(503, 'source_export_not_ready');
             }
             $page = $exporter($input, $nativeScope, $configuration, $directory);
-            if ($prices) { WooCustomerPriceProtocol::response($page, $input, $nativeScope, $raw); }
+            if ($carts) { CustomerCartsProtocol::response($page, $input, $nativeScope, $raw); }
+            elseif ($prices) { WooCustomerPriceProtocol::response($page, $input, $nativeScope, $raw); }
             elseif ($history) { WooCustomerHistoryProtocol::response($page, $input, $nativeScope, $raw); }
             else { self::validatePage($page, $input); }
             $body = json_encode($page, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
