@@ -223,10 +223,15 @@ NeuroCheckout Community.
 
 ## Availability
 
-Release **v1.0.15**:
+Release **v1.0.16**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.15/neurocheckout-connector-woocommerce-1.0.15.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.15).
+Preserves encrypted synchronization snapshots during automatic or manual API key
+rotation. Existing source cursors and revisions remain unchanged; authenticated
+requests continue to use the active connector key.
+
+
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.16/neurocheckout-connector-woocommerce-1.0.16.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.16).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their
