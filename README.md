@@ -1,5 +1,19 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Connector key rotation and local synchronization
+
+Snapshot encryption now keeps a separate, encrypted storage key per site,
+environment and shop. Changing the connector API key (manually or through the
+signed rotation endpoint) preserves the existing source stream, cursor and record
+revisions. Requests and responses still authenticate with the current API key;
+the retained storage key never authorizes network access. An unreadable storage
+key blocks synchronization rather than resetting the snapshot or exposing it.
+
+Existing healthy snapshots migrate without rewriting their data. If a previous
+rotation already made a snapshot unreadable, repair requires its earlier key
+through an authorized private recovery; reinstalling or deleting the snapshot
+is not a substitute. Install in place and keep the shop configuration intact.
+
 ## Scheduled local order history
 
 The signed `customer_history_index` operation discovers registered native accounts

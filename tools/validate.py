@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 root = pathlib.Path(__file__).resolve().parents[1]
+subprocess.run(["php", str(root / "tests/source_key_rotation_test.php")], cwd=root, check=True, timeout=60)
 files = [p for p in root.rglob("*") if p.is_file() and ".git" not in p.relative_to(root).parts]
 for p in files:
     if p.is_symlink():
