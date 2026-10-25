@@ -1,5 +1,19 @@
 # NeuroCheckout Connector for WooCommerce
 
+## Connector key rotation and local synchronization
+
+Snapshot encryption now keeps a separate, encrypted storage key per site,
+environment and shop. Changing the connector API key (manually or through the
+signed rotation endpoint) preserves the existing source stream, cursor and record
+revisions. Requests and responses still authenticate with the current API key;
+the retained storage key never authorizes network access. An unreadable storage
+key blocks synchronization rather than resetting the snapshot or exposing it.
+
+Existing healthy snapshots migrate without rewriting their data. If a previous
+rotation already made a snapshot unreadable, repair requires its earlier key
+through an authorized private recovery; reinstalling or deleting the snapshot
+is not a substitute. Install in place and keep the shop configuration intact.
+
 ## Scheduled local order history
 
 The signed `customer_history_index` operation discovers registered native accounts
@@ -209,10 +223,15 @@ NeuroCheckout Community.
 
 ## Availability
 
-Release **v1.0.15**:
+Release **v1.0.16**:
 
-- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.15/neurocheckout-connector-woocommerce-1.0.15.zip).
-- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.15).
+Preserves encrypted synchronization snapshots during automatic or manual API key
+rotation. Existing source cursors and revisions remain unchanged; authenticated
+requests continue to use the active connector key.
+
+
+- [Download the installable ZIP](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/download/v1.0.16/neurocheckout-connector-woocommerce-1.0.16.zip).
+- [Official release and verification files](https://github.com/pisob/neurocheckout-connector-woocommerce/releases/tag/v1.0.16).
 
 Do not use **Code → Download ZIP** as an installation package. Official packages
 include version information, checksums and signatures needed to verify their

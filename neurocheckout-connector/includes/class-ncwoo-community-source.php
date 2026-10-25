@@ -87,7 +87,11 @@ final class NCWooCommunitySource
                     return ['schema'=>1, 'shopId'=>$input['shopId'], 'operation'=>'customer_history',
                         'requestHash'=>hash('sha256', $raw), 'history'=>$history];
                 }
-                return (new ReconciledSourceExporter($directory, $configuration,
+                $storageConfiguration = $configuration;
+                $storageConfiguration['secret'] = (new NCWooConfig())->get_source_storage_secret(
+                    $configuration['environment'], $configuration['shopId']
+                );
+                return (new ReconciledSourceExporter($directory, $storageConfiguration,
                     static function () use ($scope, $configuration): array {
                         return WooSourceSnapshotFactory::create($scope, $configuration)->capture($scope);
                     }))->page($input);

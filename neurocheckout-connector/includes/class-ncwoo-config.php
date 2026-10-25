@@ -158,6 +158,20 @@ final class NCWooConfig
      */
     public function set(string $key, $value): void
     {
+        if ($key === self::OPTION_API_KEY) {
+            $current = $this->get_api_key();
+            if ($current !== '' && !hash_equals($current, trim((string) $value))) {
+                require_once __DIR__ . '/community/AutomaticSourceBinding.php';
+                $environment = \NeuroCheckout\WooCommerce\Community\AutomaticSourceBinding::environment(
+                    $this->get_string(self::OPTION_API_ENDPOINT)
+                );
+                if ($environment !== null && $this->get_shop_external_id() !== '') {
+                    // Capture the existing snapshot key before changing transport auth.
+                    // Failure must preserve the current connector key and its snapshot.
+                    $this->get_source_storage_secret($environment, $this->get_shop_external_id());
+                }
+            }
+        }
         if ($this->is_secret_option($key)) {
             $this->set_secret_value($key, trim((string) $value));
             return;
@@ -169,6 +183,36 @@ final class NCWooConfig
     public function get_api_key(): string
     {
         return preg_replace('/\s+/', '', $this->get_string(self::OPTION_API_KEY));
+    }
+
+    public function get_source_storage_secret(string $environment, string $shopId): string
+    {
+        if (!in_array($environment, ['production', 'staging'], true)
+            || !preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/D', $shopId)) {
+            throw new RuntimeException('source_storage_key_invalid');
+        }
+        $scope = (int) get_current_blog_id();
+        if ($scope < 1) { throw new RuntimeException('source_storage_key_invalid'); }
+        $name = 'ncwoo_source_storage_' . hash('sha256', json_encode([$environment, $scope, $shopId]));
+        $stored = get_option($name, null);
+        if ($stored === null) {
+            require_once __DIR__ . '/community/AutomaticSourceBinding.php';
+            // Existing snapshots were encrypted with this derived key. Persist it
+            // once, encrypted with WordPress secrets, without rewriting any cursor.
+            $secret = \NeuroCheckout\WooCommerce\Community\AutomaticSourceBinding::secret($this->get_api_key(), $shopId);
+            $encrypted = $this->encrypt_secret($secret);
+            if ($encrypted === null) { throw new RuntimeException('source_storage_key_unavailable'); }
+            add_option($name, self::SECRET_PREFIX . $encrypted, '', false);
+            $stored = get_option($name, null); // Use the winner of concurrent initialization.
+        }
+        if (!is_string($stored) || strpos($stored, self::SECRET_PREFIX) !== 0) {
+            throw new RuntimeException('source_storage_key_unavailable');
+        }
+        $secret = $this->decrypt_secret(substr($stored, strlen(self::SECRET_PREFIX)));
+        if (!is_string($secret) || !preg_match('/^[a-f0-9]{64}$/D', $secret)) {
+            throw new RuntimeException('source_storage_key_unavailable');
+        }
+        return $secret;
     }
 
     public function get_pending_api_key(): string
